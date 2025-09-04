@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6930c3">
+    <meta name="description" content="PDF Compressor PWA - Compress your PDF files locally in your browser without uploading them to any server">
+    
+    <title>PDF Compressor PWA</title>
+    
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/responsive.css">
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="./manifest.json">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="./assets/icons/icon-192x192.png">
+    
+    <!-- iOS Safari -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="PDF Compressor PWA">
+</head>
+<body>
+    <!-- PWA Installation Banner (hidden by default) -->
+    <div id="installBanner" class="install-banner" style="display: none;">
+        <p>Install PDF Compressor PWA for offline access</p>
+        <button id="installBtn">Install</button>
+        <button id="closeInstallBanner">✕</button>
+    </div>
+
+    <!-- Offline Notification (hidden by default) -->
+    <div id="offlineNotification" class="offline-notification" style="display: none;">
+        <p>You are currently offline. Some features may be limited.</p>
+    </div>
+
+    <header>
+        <div class="logo">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.5 18H10.5V21H8.5V18Z" fill="#6930c3"/>
+                <path d="M13.5 18H15.5V21H13.5V18Z" fill="#6930c3"/>
+                <path d="M2 11V3H22V11H2Z" fill="#6930c3"/>
+                <path d="M2 21V14H22V21H2Z" fill="#6930c3"/>
+                <path d="M4 19H6V16H4V19Z" fill="white"/>
+                <path d="M18 19H20V16H18V19Z" fill="white"/>
+                <path d="M9 5H15V7H9V5Z" fill="white"/>
+                <path d="M9 16H15V18H9V16Z" fill="white"/>
+            </svg>
+        </div>
+        <h1>PDF Compressor PWA</h1>
+    </header>
+    
+    <main>
+        <div class="upload-container">
+            <!-- Drag and Drop Area -->
+            <div class="drop-area" id="dropArea">
+                <div class="drop-icon">📁</div>
+                <p>Drag & drop your PDF file here</p>
+                <p class="file-limit">Supports files up to 500MB</p>
+                <button id="browseBtn">Browse Files</button>
+                <input type="file" id="fileInput" accept=".pdf" hidden>
+            </div>
+            
+            <!-- File Info Panel (hidden by default) -->
+            <div class="file-info-panel" id="fileInfoPanel" style="display: none;">
+                <h3>File Information</h3>
+                <div class="info-row">
+                    <span class="label">File Name:</span>
+                    <span id="fileName" class="value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="label">File Size:</span>
+                    <span id="fileSize" class="value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Page Count:</span>
+                    <span id="pageCount" class="value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Estimated Images:</span>
+                    <span id="imageCount" class="value"></span>
+                </div>
+            </div>
+            
+            <!-- Options Section -->
+            <div class="options-section">
+                <div class="tabs">
+                    <div class="tab active" data-tab="compression">Compression</div>
+                    <div class="tab" data-tab="removal">Removal</div>
+                    <div class="tab" data-tab="split">Split</div>
+                </div>
+                
+                <div class="tab-content">
+                    <!-- Compression Tab -->
+                    <div class="tab-pane active" id="compressionTab">
+                        <div class="option-item">
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="imageCompressionToggle" checked>
+                                <label for="imageCompressionToggle" class="toggle-label">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="option-label">Image Compression</span>
+                            </div>
+                            <div class="slider-container">
+                                <label for="qualitySlider">Quality: <span id="qualityValue">70</span>%</label>
+                                <input type="range" id="qualitySlider" min="10" max="100" value="70">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Removal Tab -->
+                    <div class="tab-pane" id="removalTab">
+                        <div class="option-item">
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="removeImagesToggle">
+                                <label for="removeImagesToggle" class="toggle-label">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="option-label">Remove Images</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Split Tab -->
+                    <div class="tab-pane" id="splitTab">
+                        <div class="option-item">
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="splitToggle">
+                                <label for="splitToggle" class="toggle-label">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="option-label">Split PDF</span>
+                            </div>
+                            <div class="split-options">
+                                <div class="radio-group">
+                                    <input type="radio" id="splitByPages" name="splitMethod" value="pages" checked>
+                                    <label for="splitByPages">By Page Range</label>
+                                </div>
+                                <div class="radio-group">
+                                    <input type="radio" id="splitBySize" name="splitMethod" value="size">
+                                    <label for="splitBySize">By File Size</label>
+                                </div>
+                                <div class="split-input" id="pagesInput">
+                                    <label for="pageRange">Page Range (e.g., 1-5):</label>
+                                    <input type="text" id="pageRange" placeholder="1-5">
+                                </div>
+                                <div class="split-input" id="sizeInput" style="display: none;">
+                                    <label for="fileSizeLimit">Max File Size (MB):</label>
+                                    <input type="number" id="fileSizeLimit" min="1" max="500" value="10">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="resetBtn">Reset</button>
+                <button id="processBtn">Process PDF</button>
+            </div>
+            
+            <!-- Progress Section (hidden by default) -->
+            <div class="progress-section" id="progressSection" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p id="progressText">Processing...</p>
+            </div>
+            
+            <!-- Results Section (hidden by default) -->
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <h3>Processing Complete!</h3>
+                <div class="result-item">
+                    <span>Original File:</span>
+                    <a href="#" id="originalDownload" download>Download Original</a>
+                </div>
+                <div class="result-item">
+                    <span>Compressed File:</span>
+                    <a href="#" id="compressedDownload" download>Download Compressed</a>
+                </div>
+                <div class="result-stats">
+                    <p>Original Size: <span id="originalSize"></span></p>
+                    <p>Compressed Size: <span id="compressedSize"></span></p>
+                    <p>Savings: <span id="savings"></span></p>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <p>&copy; 2023 PDF Compressor PWA. All processing happens locally in your browser.</p>
+    </footer>
+    
+    <!-- CDN fallback for pdf-lib and pdf.js -->
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+    
+    <script src="../src/js/app.js"></script>
+</body>
+</html>

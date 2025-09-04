@@ -1,0 +1,165 @@
+{
+  "name": "PDF Compressor PWA",
+  "short_name": "PDFCompress",
+  "description": "Compress, split and optimize PDFs locally",
+  "categories": ["productivity", "utilities"],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#6930c3",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "./assets/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Compress PDF",
+      "short_name": "Compress",
+      "description": "Compress a PDF file",
+      "url": "/?action=compress",
+      "icons": [
+        {
+          "src": "./assets/icons/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Split PDF",
+      "short_name": "Split",
+      "description": "Split a PDF file into multiple parts",
+      "url": "/?action=split",
+      "icons": [
+        {
+          "src": "./assets/icons/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Remove Images",
+      "short_name": "Remove Images",
+      "description": "Remove images from a PDF file",
+      "url": "/?action=remove-images",
+      "icons": [
+        {
+          "src": "./assets/icons/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "pdf-file",
+          "accept": ["application/pdf", ".pdf"]
+        }
+      ]
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/open",
+      "accept": {
+        "application/pdf": [".pdf"]
+      },
+      "icons": [
+        {
+          "src": "./assets/icons/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "launch_type": "single-client"
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+pdf",
+      "url": "/handle?url=%s"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "./assets/screenshots/mobile-1.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "platform": "mobile",
+      "label": "PDF Compressor main interface on mobile"
+    },
+    {
+      "src": "./assets/screenshots/mobile-2.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "platform": "mobile",
+      "label": "PDF processing options on mobile"
+    },
+    {
+      "src": "./assets/screenshots/desktop-1.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "platform": "desktop",
+      "label": "PDF Compressor main interface on desktop"
+    },
+    {
+      "src": "./assets/screenshots/desktop-2.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "platform": "desktop",
+      "label": "PDF processing results on desktop"
+    }
+  ]
+}
