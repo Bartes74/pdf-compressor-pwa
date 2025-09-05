@@ -10,6 +10,7 @@ window.hideLoadingLibraries = function() {
 };
 
 import { UIController } from './ui-controller.js';
+import { createEngine } from './engine/index.js';
 // Remove static imports of PDFProcessor and StorageManager since we'll load them dynamically
 // import { PDFProcessor } from './pdf-processor.js';
 // import { StorageManager } from './storage-manager.js';
@@ -31,6 +32,7 @@ class PDFCompressorApp {
     this.storageManager = null;
     this.uiController = null;
     this.worker = null;
+    this.engine = null;
     
     // Application state
     this.state = {
@@ -116,6 +118,9 @@ class PDFCompressorApp {
     
     // Set reference to app in UI controller
     this.uiController.setApp(this);
+    
+    // Initialize processing engine (feature-flagged)
+    this.engine = createEngine(this);
     
     // Setup event listeners
     this.setupEventListeners();
@@ -269,8 +274,8 @@ class PDFCompressorApp {
         this.uiController.updateProgress(percent, message);
       };
       
-      // Process PDF based on options
-      const result = await this.pdfProcessor.processPDF(
+      // Process PDF via engine
+      const result = await this.engine.process(
         this.state.currentFile,
         this.state.processingOptions,
         progressCallback
