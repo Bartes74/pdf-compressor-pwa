@@ -1,3 +1,4 @@
+/* global PDFLib */
 /**
  * Web Worker dla przetwarzania PDF
  * Przenosi ciężkie operacje poza główny wątek

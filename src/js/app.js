@@ -16,7 +16,7 @@ import { createEngine } from './engine/index.js';
 // import { StorageManager } from './storage-manager.js';
 
 // We'll initialize storage manager dynamically
-let storageManager = null;
+let storageManager = null; // kept as let for late dynamic init across modules
 
 /**
  * PDF Compressor PWA - Main Application Class
@@ -418,11 +418,11 @@ class PDFCompressorApp {
       this.state.isProcessing = false;
       console.error('[PDFCompressor] Error processing PDF:', error);
       // Hide progress if visible
-      try { this.uiController.hideProgress(); } catch {}
+      try { this.uiController.hideProgress(); } catch (e) { /* noop */ }
       // Show localized message
       // Pokaż modal błędu (centrowany, z OK)
       try { this.uiController.showErrorModal(error?.message || 'Wystąpił błąd'); }
-      catch { this.showErrorMessage('Błąd przetwarzania PDF: ' + (error?.message || error)); }
+      catch (e) { this.showErrorMessage('Błąd przetwarzania PDF: ' + (error?.message || error)); }
     }
   }
 
@@ -859,7 +859,7 @@ class PDFCompressorApp {
    * @returns {string} New file name
    */
   generateFileName(originalName, options) {
-    const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "");
+    const nameWithoutExt = originalName.replace(/\.[^/.]+$/, '');
     const extension = '.pdf';
     
     let suffix = '';

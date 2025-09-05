@@ -1,0 +1,41 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "jest": true
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module"
+  },
+  "globals": {
+    "window": "readonly",
+    "document": "readonly",
+    "PDFLib": "readonly",
+    "createImageBitmap": "readonly",
+    "global": "readonly"
+  },
+  "rules": {
+    "no-console": "warn",
+    "no-empty": "off",
+    "no-constant-condition": "warn",
+    "no-undef": "warn",
+    "indent": "off",
+    "quotes": "off",
+    "prefer-const": "warn",
+    "no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/tests/**/*.js"],
+      "env": { "jest": true, "node": true },
+      "rules": { "no-undef": "off" }
+    }
+  ]
+}
+

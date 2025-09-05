@@ -1,3 +1,4 @@
+/* global global */
 import { StorageManager } from '../js/storage-manager.js';
 
 describe('StorageManager', () => {

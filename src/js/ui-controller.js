@@ -58,7 +58,7 @@ export class UIController {
     // Apply initial theme
     this.applyTheme();
     // Force hide install banner if present
-    try { const el = document.getElementById('installBanner'); if (el) el.style.display = 'none'; } catch {}
+    try { const el = document.getElementById('installBanner'); if (el) el.style.display = 'none'; } catch (e) {}
     
     // Handle initial responsive state
     this.handleResize();

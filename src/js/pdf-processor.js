@@ -69,7 +69,7 @@ export class PDFProcessor {
       const pdfDoc = await this.PDFLib.PDFDocument.load(arrayBuffer, { updateMetadata: false });
       const metadata = this.extractMetadata(pdfDoc, file);
       // Normalize object streams setting globally for saves from this document
-      try { pdfDoc.context.trailerInfo = { ...(pdfDoc.context.trailerInfo||{}), Encrypt: undefined }; } catch {}
+      try { pdfDoc.context.trailerInfo = { ...(pdfDoc.context.trailerInfo||{}), Encrypt: undefined }; } catch (e) { /* noop */ }
       return { pdfDoc, metadata, arrayBuffer };
     } catch (error) {
       console.error('[PDFProcessor] Error loading PDF:', error);
@@ -188,7 +188,7 @@ export class PDFProcessor {
       if (minSinglePage > limit) {
         const mb = (minSinglePage / 1024 / 1024).toFixed(2);
         const sel = (limit / 1024 / 1024).toFixed(2);
-        const msg = `Minimalny rozmiar części (${mb} MB) przekracza wybrany limit (${sel} MB). Zwiększ limit lub użyj podziału po stronach.`;
+        const msg = 'Minimalny rozmiar części (' + mb + ' MB) przekracza wybrany limit (' + sel + ' MB). Zwiększ limit lub użyj podziału po stronach.';
         if (progressCallback) progressCallback({ percentage: 0, message: msg });
         throw new Error(msg);
       }

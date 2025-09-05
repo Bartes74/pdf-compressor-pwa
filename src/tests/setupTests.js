@@ -1,3 +1,4 @@
+/* global global */
 // Setup tests for Jest
 require('jest-canvas-mock');
 

@@ -1,3 +1,4 @@
+/* global global */
 import { PDFProcessor } from '../js/pdf-processor.js';
 
 // Mock pdf-lib
