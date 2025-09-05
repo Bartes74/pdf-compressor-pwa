@@ -14,15 +14,17 @@ export function createEnhancedEngine(app) {
 
       let processedDoc = pdfDoc;
 
-      // Removal without rasterizing text
+      // Removal without rasterizing text (experimental first-page pass under hidden flag)
       if (options.removeImages) {
-        if (progressCallback) progressCallback({ percentage: 5, message: 'Removing images…' });
+        if (progressCallback) progressCallback({ percentage: 5, message: 'Removing images (page 1)…' });
+        processedDoc = await app.pdfProcessor.removeImagesOnFirstPageWithoutRasterization(processedDoc);
+        if (progressCallback) progressCallback({ percentage: 10, message: 'Analyzing images…' });
         processedDoc = await app.pdfProcessor.removeImagesPreserveText(processedDoc);
       }
 
-      // Compression: for now, keep legacy behavior (no rasterization in enhanced path yet)
+      // Compression: keep non-rasterizing placeholder for now
       if (options.imageCompression) {
-        if (progressCallback) progressCallback({ percentage: 15, message: 'Compressing images…' });
+        if (progressCallback) progressCallback({ percentage: 20, message: 'Compressing images…' });
         processedDoc = await app.pdfProcessor.compressImagesInMainThread(processedDoc, options.imageQuality, progressCallback);
       }
 

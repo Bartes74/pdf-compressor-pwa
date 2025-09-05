@@ -1020,4 +1020,72 @@ export class PDFProcessor {
       return pdfDoc;
     }
   }
+
+  hasHiddenFlag(name) {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get(name) === '1') return true;
+    } catch {}
+    try {
+      return localStorage.getItem(`flag-${name}`) === '1';
+    } catch {}
+    return false;
+  }
+
+  /**
+   * Experimental: remove image Do operators from first page content stream (no rasterization)
+   * Only attempts on simple/uncompressed streams; otherwise returns original.
+   */
+  async removeImagesOnFirstPageWithoutRasterization(pdfDoc) {
+    if (!this.hasHiddenFlag('rm1')) return pdfDoc;
+    try {
+      const { PDFName, PDFArray, PDFDict } = this.PDFLib;
+      const page = pdfDoc.getPage(0);
+      const pageDict = pdfDoc.context.lookup(page.ref, PDFDict);
+      const contentsObj = pageDict.lookup(PDFName.of('Contents'));
+
+      const textEncoder = new TextEncoder();
+      const textDecoder = new TextDecoder('latin1');
+      const filterDo = (bytes) => {
+        const src = textDecoder.decode(bytes);
+        // Remove occurrences like "/Im1 Do" possibly with preceding whitespace
+        const filtered = src.replace(/\s\/[A-Za-z0-9_\.\-]+\s+Do\b/g, '');
+        return textEncoder.encode(filtered);
+      };
+
+      if (contentsObj instanceof PDFArray) {
+        const newStreams = [];
+        let changed = false;
+        for (let idx = 0; idx < contentsObj.size(); idx++) {
+          const s = contentsObj.get(idx);
+          const stream = pdfDoc.context.lookup(s);
+          if (!stream || typeof stream.getContents !== 'function') {
+            newStreams.push(s);
+            continue;
+          }
+          const original = stream.getContents();
+          const filtered = filterDo(original);
+          if (filtered && filtered.length !== original.length) changed = true;
+          const newStream = pdfDoc.context.flateStream(filtered);
+          newStreams.push(newStream);
+        }
+        if (changed) {
+          const arr = this.PDFLib.PDFArray.withContext(pdfDoc.context);
+          newStreams.forEach((ns) => arr.push(ns));
+          pageDict.set(PDFName.of('Contents'), arr);
+        }
+      } else if (contentsObj && typeof contentsObj.getContents === 'function') {
+        const original = contentsObj.getContents();
+        const filtered = filterDo(original);
+        if (filtered && filtered.length !== original.length) {
+          const newStream = pdfDoc.context.flateStream(filtered);
+          pageDict.set(PDFName.of('Contents'), newStream);
+        }
+      }
+      return pdfDoc;
+    } catch (err) {
+      console.warn('[PDFProcessor] removeImagesOnFirstPageWithoutRasterization skipped:', err);
+      return pdfDoc;
+    }
+  }
 }
