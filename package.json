@@ -7,6 +7,8 @@
     "start": "webpack serve --config webpack.dev.js",
     "dev": "webpack serve --config webpack.dev.js",
     "build": "webpack --config webpack.prod.js",
+    "electron:dev": "npm run build && electron .",
+    "electron:build": "npm run build && electron-builder -mwl",
     "build:analyze": "ANALYZE=true webpack --config webpack.prod.js",
     "serve": "serve dist -s -p 3000",
     "clean": "rm -rf dist",
@@ -50,6 +52,8 @@
     "css-loader": "^6.8.1",
     "css-minimizer-webpack-plugin": "^5.0.1",
     "eslint": "^8.45.0",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.6.4",
     "gh-pages": "^5.0.0",
     "html-webpack-plugin": "^5.5.3",
     "husky": "^8.0.3",
@@ -79,6 +83,32 @@
     "workbox-webpack-plugin": "^7.0.0",
     "worker-loader": "^3.0.8"
   },
+  "build": {
+    "productName": "PDF Compressor",
+    "appId": "com.yourorg.pdfcompressor",
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    }
+  }
   "lint-staged": {
     "*.{js,css,json,md}": [
       "prettier --write"
