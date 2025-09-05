@@ -975,12 +975,40 @@ export class PDFProcessor {
     }
   }
 
+  /**
+   * Analyze image usage per page using pdf.js operator list (non-destructive)
+   */
+  async analyzeImages(pdfDoc) {
+    const bytes = await pdfDoc.save();
+    const loadingTask = window.pdfjsLib.getDocument({ data: bytes });
+    const pdf = await loadingTask.promise;
+    const OPS = window.pdfjsLib.OPS || {};
+    const result = [];
+    const pageCount = pdf.numPages || pdfDoc.getPageCount();
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await pdf.getPage(i);
+      const opList = await page.getOperatorList();
+      let count = 0;
+      for (let j = 0; j < opList.fnArray.length; j++) {
+        const fn = opList.fnArray[j];
+        if (
+          fn === OPS.paintImageXObject ||
+          fn === OPS.paintInlineImageXObject ||
+          fn === OPS.paintImageXObjectRepeat
+        ) {
+          count += 1;
+        }
+      }
+      result.push({ page: i, imageOps: count });
+    }
+    return result;
+  }
+
   async removeImagesPreserveText(pdfDoc) {
     try {
       console.log('[PDFProcessor] removeImagesPreserveText: starting (non-destructive stub)');
-      // NOTE: This is a safe no-op placeholder to keep text intact and avoid corrupting PDFs.
-      // Next steps (M2): walk page resources, identify Image XObjects and strip their invocations
-      // from content streams without rasterizing text.
+      const analysis = await this.analyzeImages(pdfDoc);
+      console.log('[PDFProcessor] Image usage by page:', analysis);
       return pdfDoc;
     } catch (error) {
       console.warn('[PDFProcessor] removeImagesPreserveText failed, returning original document:', error);
