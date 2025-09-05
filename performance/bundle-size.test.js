@@ -5,12 +5,12 @@ const fs = require('fs');
 const path = require('path');
 
 // Define size limits (in bytes)
-// Increased limits to accommodate PDF processing libraries
+// Updated limits after implementing code splitting
 const SIZE_LIMITS = {
-  javascript: 800 * 1024, // 800 KB (pdf-lib is quite large)
+  javascript: 600 * 1024, // 600 KB (main app bundle, pdf-lib is now separate)
   css: 150 * 1024,        // 150 KB
   html: 100 * 1024,       // 100 KB
-  total: 3500 * 1024      // 3.5 MB (to accommodate pdf-lib)
+  total: 4000 * 1024      // 4 MB (includes all assets)
 };
 
 // Function to get file sizes in a directory

@@ -1,8 +1,6 @@
 // PDFProcessor.js - Handles PDF processing logic using pdf-lib
 // This implementation provides comprehensive PDF manipulation capabilities
 
-import { PDFDocument, rgb } from 'pdf-lib';
-
 /**
  * PDFProcessor - Class for processing PDF files with various operations
  * Uses pdf-lib for PDF manipulation and provides methods for compression, splitting, and optimization
@@ -15,166 +13,174 @@ export class PDFProcessor {
     this.worker = null;
     this.isWorkerSupported = typeof Worker !== 'undefined';
     this.taskCounter = 0;
+    this.PDFLib = null;
+    this.pdfjsLib = null;
+  }
+  /**
+   * Remove images by rasterizing all pages to image-only pages (simulates removal of embedded images)
+   * This approach ensures visually similar output but strips original embedded images/objects.
+   */
+  async removeImages(pdfDoc) {
+    try {
+      // Render each page to canvas and rebuild as image-only PDF
+      const pageCount = pdfDoc.getPageCount();
+      const images = [];
+      // Use pdf.js (window.pdfjsLib) to render
+      const originalBytes = await pdfDoc.save();
+      const loadingTask = window.pdfjsLib.getDocument({ data: originalBytes });
+      const pdf = await loadingTask.promise;
+      for (let i = 1; i <= pageCount; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+        images.push({ blob, width: viewport.width, height: viewport.height });
+      }
+      const newPdf = await this.PDFLib.PDFDocument.create();
+      for (const img of images) {
+        const bytes = new Uint8Array(await img.blob.arrayBuffer());
+        const embedded = await newPdf.embedJpg(bytes);
+        const page = newPdf.addPage([img.width, img.height]);
+        page.drawImage(embedded, { x: 0, y: 0, width: img.width, height: img.height });
+      }
+      return newPdf;
+    } catch (error) {
+      console.error('[PDFProcessor] Error removing images via rasterization:', error);
+      throw new Error(`Failed to remove images: ${error.message}`);
+    }
   }
 
   /**
-   * Initialize Web Worker for heavy operations
-   * @returns {Promise<Worker>} - Initialized worker
+   * Rasterize pages and rebuild PDF to approximate image compression
    */
-  async initWorker() {
-    if (!this.isWorkerSupported) {
-      throw new Error('Web Workers not supported in this environment');
-    }
-    
-    if (this.worker) {
-      return this.worker;
-    }
-    
-    try {
-      // For webpack, we need to use a different approach to load the worker
-      // We'll dynamically create the worker using Blob URL
-      const workerBlob = new Blob([`importScripts('${window.location.origin}/src/js/pdf-worker.js');`], {
-        type: 'application/javascript'
-      });
-      const workerUrl = URL.createObjectURL(workerBlob);
-      
-      // Create worker
-      this.worker = new Worker(workerUrl);
-      
-      // Set up message handling
-      this.setupWorkerMessaging();
-      
-      // Wait for worker to be ready
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Worker initialization timeout'));
-        }, 5000);
-        
-        const readyHandler = (event) => {
-          if (event.data.type === 'WORKER_READY') {
-            clearTimeout(timeout);
-            this.worker.removeEventListener('message', readyHandler);
-            console.log('[PDFProcessor] Web Worker initialized');
-            resolve(this.worker);
-          }
-        };
-        
-        this.worker.addEventListener('message', readyHandler);
-      });
-      
-      // Clean up the blob URL
-      URL.revokeObjectURL(workerUrl);
-      
-      return this.worker;
-    } catch (error) {
-      console.error('[PDFProcessor] Error initializing worker:', error);
-      this.worker = null;
-      throw new Error(`Failed to initialize worker: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Set up worker message handling
-   */
-  setupWorkerMessaging() {
-    if (!this.worker) return;
-    
-    this.worker.onmessage = (event) => {
-      const { type, taskId, result, error, percentage, message, performance } = event.data;
-      
-      // Handle different message types
-      switch (type) {
-        case 'PROGRESS_UPDATE':
-          // Progress updates are handled by specific task handlers
-          break;
-          
-        case 'PROCESSING_COMPLETED':
-          // Find and resolve the corresponding promise
-          if (this.pendingTasks && this.pendingTasks[taskId]) {
-            const { resolve } = this.pendingTasks[taskId];
-            delete this.pendingTasks[taskId];
-            resolve({ result, performance });
-          }
-          break;
-          
-        case 'ERROR':
-          // Find and reject the corresponding promise
-          if (this.pendingTasks && this.pendingTasks[taskId]) {
-            const { reject } = this.pendingTasks[taskId];
-            delete this.pendingTasks[taskId];
-            reject(new Error(error));
-          }
-          break;
-          
-        case 'TASK_QUEUED':
-        case 'PROCESSING_STARTED':
-        case 'TASK_CANCELLED':
-        case 'TASK_NOT_FOUND':
-        case 'STATUS_UPDATE':
-        case 'WORKER_READY':
-        case 'WORKER_CLEANUP_COMPLETED':
-          // These are informational messages
-          console.log(`[PDFProcessor] Worker message: ${type}`);
-          break;
-          
-        default:
-          console.warn(`[PDFProcessor] Unknown worker message type: ${type}`);
+  async rasterizeAndRebuild(file, quality, progressCallback = null) {
+    const arrayBuffer = await file.arrayBuffer();
+    const srcPdf = await this.PDFLib.PDFDocument.load(arrayBuffer, { updateMetadata: false });
+    const pageCount = srcPdf.getPageCount();
+    const originalBytes = await srcPdf.save();
+    const loadingTask = window.pdfjsLib.getDocument({ data: originalBytes });
+    const pdf = await loadingTask.promise;
+    const newPdf = await this.PDFLib.PDFDocument.create();
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const q = Math.max(0.1, Math.min(1, Number(quality) / 100));
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', q));
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const embedded = await newPdf.embedJpg(bytes);
+      const newPage = newPdf.addPage([viewport.width, viewport.height]);
+      newPage.drawImage(embedded, { x: 0, y: 0, width: viewport.width, height: viewport.height });
+      if (progressCallback) {
+        progressCallback({ percentage: Math.round((i / pageCount) * 100), message: `Compressing page ${i}/${pageCount}` });
       }
-    };
-    
-    this.worker.onerror = (error) => {
-      console.error('[PDFProcessor] Worker error:', error);
-    };
-    
-    // Track pending tasks
-    this.pendingTasks = {};
-  }
-  
-  /**
-   * Generate unique task ID
-   * @returns {string} - Unique task ID
-   */
-  generateTaskId() {
-    return `task-${Date.now()}-${++this.taskCounter}`;
+    }
+    return newPdf;
   }
 
   /**
-   * Load a PDF file and extract metadata
-   * @param {File} file - The PDF file to load
-   * @returns {Promise<Object>} - Object containing PDF document and metadata
+   * Initialize PDF libraries
    */
-  async loadPDF(file) {
-    try {
-      console.log('[PDFProcessor] Loading PDF file:', file.name);
-      
-      // Validate PDF file
-      if (!this.validatePDF(file)) {
-        throw new Error('Invalid PDF file');
-      }
-      
-      // Convert File to ArrayBuffer
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Load PDF document using pdf-lib
-      const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-        updateMetadata: false,
-        parseSpeed: 'fast' // For better performance with large files
-      });
-      
-      // Extract metadata
-      const metadata = this.extractMetadata(pdfDoc, file);
-      
-      console.log('[PDFProcessor] PDF loaded successfully');
-      
-      return {
-        pdfDoc,
-        metadata,
-        arrayBuffer
-      };
-    } catch (error) {
-      console.error('[PDFProcessor] Error loading PDF:', error);
-      throw new Error(`Failed to load PDF: ${error.message}`);
+  async initialize() {
+    // Check if libraries are available globally (from CDN)
+    if (window.PDFLib && window.pdfjsLib) {
+      this.PDFLib = window.PDFLib;
+      this.pdfjsLib = window.pdfjsLib;
+      return true;
     }
+    
+    // Fallback: try to load dynamically
+    try {
+      // These imports will work only if libraries are in node_modules
+      // In production we use CDN, so this is only fallback
+      if (!this.PDFLib) {
+        this.PDFLib = window.PDFLib || await this.loadPDFLib();
+      }
+      if (!this.pdfjsLib) {
+        this.pdfjsLib = window.pdfjsLib || await this.loadPDFJS();
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize PDF libraries:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Load PDFLib library
+   */
+  async loadPDFLib() {
+    // Fallback for development
+    try {
+      const module = await import(/* webpackIgnore: true */ 'pdf-lib');
+      return module;
+    } catch {
+      // If not in node_modules, use global version
+      return window.PDFLib;
+    }
+  }
+
+  /**
+   * Load PDF.js library
+   */
+  async loadPDFJS() {
+    // Fallback for development
+    try {
+      const module = await import(/* webpackIgnore: true */ 'pdfjs-dist');
+      return module;
+    } catch {
+      // If not in node_modules, use global version
+      return window.pdfjsLib;
+    }
+  }
+
+  /**
+   * Load PDF libraries dynamically
+   * @deprecated Use initialize() instead
+   */
+  async loadLibraries() {
+    // Initialize libraries if not already initialized
+    if (!this.PDFLib || !this.pdfjsLib) {
+      const initialized = await this.initialize();
+      if (!initialized) {
+        throw new Error('PDF libraries not available');
+      }
+    }
+    
+    return { 
+      PDFDocument: this.PDFLib.PDFDocument, 
+      rgb: this.PDFLib.rgb,
+      pdfjsLib: this.pdfjsLib
+    };
+  }
+
+  /**
+   * Process a PDF file
+   * @param {File} file - The PDF file to process
+   * @returns {Promise<Object>} - Processing result
+   */
+  async processFile(file) {
+    // Initialize libraries if not already initialized
+    if (!this.PDFLib || !this.pdfjsLib) {
+      const initialized = await this.initialize();
+      if (!initialized) {
+        throw new Error('PDF libraries not available');
+      }
+    }
+    
+    // Process file
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfDoc = await this.PDFLib.PDFDocument.load(arrayBuffer);
+    
+    return this.processPDF(pdfDoc);
   }
 
   /**
@@ -185,20 +191,61 @@ export class PDFProcessor {
    * @returns {Promise<PDFDocument>} - Processed PDF document
    */
   async compressImages(pdfDoc, quality, progressCallback = null) {
+    // Prefer worker if available and initialized
+    try {
+      if (this.isWorkerSupported) {
+        await this.initWorker();
+        return await this.compressImagesWithWorker(pdfDoc, quality, progressCallback);
+      }
+    } catch (e) {
+      console.warn('[PDFProcessor] Worker path failed, using main thread:', e);
+    }
+    // Fallback to main thread
+    return this.compressImagesInMainThread(pdfDoc, quality, progressCallback);
+  }
+
+  /**
+   * Initialize Web Worker
+   */
+  async initWorker() {
+    if (this.worker) return;
+    // Use bundler-resolved URL for worker
+    const WorkerConstructor = (await import(/* webpackChunkName: "pdf-worker" */ /* webpackMode: "lazy" */ './pdf-worker.js')).default;
+    this.worker = new WorkerConstructor();
+    // Setup basic response handling map
+    if (!this.pendingTasks) this.pendingTasks = {};
+    this.worker.onmessage = (event) => {
+      const { type, taskId } = event.data || {};
+      if (!taskId || !this.pendingTasks || !this.pendingTasks[taskId]) return;
+      if (type === 'PROCESSING_COMPLETED') {
+        this.pendingTasks[taskId].resolve(event.data);
+        delete this.pendingTasks[taskId];
+      } else if (type === 'ERROR') {
+        this.pendingTasks[taskId].reject(new Error(event.data.error || 'Worker error'));
+        delete this.pendingTasks[taskId];
+      }
+    };
+  }
+
+  /**
+   * Generate unique task id
+   */
+  generateTaskId() {
+    this.taskCounter += 1;
+    return `task-${Date.now()}-${this.taskCounter}`;
+  }
+
+  /**
+   * Compress images in main thread (fallback)
+   * @param {PDFDocument} pdfDoc - The PDF document to process
+   * @param {number} quality - Image quality (10-100)
+   * @param {Function} progressCallback - Callback for progress updates
+   * @returns {Promise<PDFDocument>} - Processed PDF document
+   */
+  async compressImagesInMainThread(pdfDoc, quality, progressCallback = null) {
     try {
       console.log(`[PDFProcessor] Compressing images with quality: ${quality}`);
       
-      // Try to use worker if available
-      if (this.isWorkerSupported) {
-        try {
-          await this.initWorker();
-          return await this.compressImagesWithWorker(pdfDoc, quality, progressCallback);
-        } catch (workerError) {
-          console.warn('[PDFProcessor] Worker failed, falling back to main thread:', workerError);
-        }
-      }
-      
-      // Fallback to main thread processing
       const pages = pdfDoc.getPages();
       const total = pages.length;
       
@@ -217,7 +264,8 @@ export class PDFProcessor {
           progressCallback({
             page: i + 1,
             total,
-            percentage: Math.round(((i + 1) / total) * 100)
+            percentage: Math.round(((i + 1) / total) * 100),
+            message: `Compressing page ${i + 1} of ${total}`
           });
         }
         
@@ -232,7 +280,7 @@ export class PDFProcessor {
       throw new Error(`Failed to compress images: ${error.message}`);
     }
   }
-  
+
   /**
    * Compress images using Web Worker
    * @param {PDFDocument} pdfDoc - The PDF document to process
@@ -289,7 +337,7 @@ export class PDFProcessor {
     const { result } = await taskPromise;
     
     // Load the processed PDF
-    const processedPdf = await PDFDocument.load(result.pdfBytes);
+    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
     return processedPdf;
   }
 
@@ -372,7 +420,7 @@ export class PDFProcessor {
     const { result } = await taskPromise;
     
     // Load the processed PDF
-    const processedPdf = await PDFDocument.load(result.pdfBytes);
+    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
     return processedPdf;
   }
 
@@ -386,6 +434,14 @@ export class PDFProcessor {
   async splitByPages(pdfDoc, startPage, endPage) {
     try {
       console.log(`[PDFProcessor] Splitting PDF by pages: ${startPage}-${endPage}`);
+      
+      // Initialize libraries if not already initialized
+      if (!this.PDFLib || !this.pdfjsLib) {
+        const initialized = await this.initialize();
+        if (!initialized) {
+          throw new Error('PDF libraries not available');
+        }
+      }
       
       // Try to use worker if available
       if (this.isWorkerSupported) {
@@ -404,7 +460,7 @@ export class PDFProcessor {
       }
       
       // Create new PDF document
-      const newPdfDoc = await PDFDocument.create();
+      const newPdfDoc = await this.PDFLib.PDFDocument.create();
       
       // Copy pages to new document
       for (let i = startPage; i <= endPage; i++) {
@@ -460,7 +516,7 @@ export class PDFProcessor {
     const { result } = await taskPromise;
     
     // Load the processed PDF
-    const processedPdf = await PDFDocument.load(result.pdfBytes);
+    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
     return processedPdf;
   }
 
@@ -559,6 +615,14 @@ export class PDFProcessor {
     try {
       console.log('[PDFProcessor] Optimizing PDF');
       
+      // Initialize libraries if not already initialized
+      if (!this.PDFLib || !this.pdfjsLib) {
+        const initialized = await this.initialize();
+        if (!initialized) {
+          throw new Error('PDF libraries not available');
+        }
+      }
+      
       // Try to use worker if available
       if (this.isWorkerSupported) {
         try {
@@ -616,7 +680,7 @@ export class PDFProcessor {
     const { result } = await taskPromise;
     
     // Load the processed PDF
-    const processedPdf = await PDFDocument.load(result.pdfBytes);
+    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
     return processedPdf;
   }
 
@@ -626,7 +690,7 @@ export class PDFProcessor {
    * @param {Object} options - Processing options
    * @returns {Promise<Object>} - Processing result
    */
-  async processPDF(file, options) {
+  async processPDF(file, options, progressCallback = null) {
     try {
       console.log('[PDFProcessor] Processing PDF with options:', options);
       
@@ -635,9 +699,9 @@ export class PDFProcessor {
       
       let processedDoc = pdfDoc;
       
-      // Apply image compression if requested
+      // Apply image compression if requested (rasterize pages to JPEG at target quality)
       if (options.imageCompression) {
-        processedDoc = await this.compressImages(processedDoc, options.imageQuality);
+        processedDoc = await this.rasterizeAndRebuild(file, options.imageQuality, progressCallback);
       }
       
       // Remove images if requested
@@ -661,17 +725,56 @@ export class PDFProcessor {
       // Optimize PDF
       processedDoc = await this.optimizePDF(processedDoc);
       
-      // Serialize to bytes
-      const pdfBytes = await processedDoc.save();
+      // Serialize to bytes with error handling
+      let pdfBytes;
+      try {
+        pdfBytes = await processedDoc.save();
+      } catch (saveError) {
+        console.error('[PDFProcessor] Error saving PDF document:', saveError);
+        throw new Error(`Failed to save processed PDF: ${saveError.message}`);
+      }
+      
+      // Validate pdfBytes before creating File
+      if (!pdfBytes || pdfBytes.length === 0) {
+        throw new Error('Processed PDF is empty or invalid');
+      }
       
       // Create new file
       const newFileName = this.generateFileName(file.name, options);
-      const processedFile = new File([pdfBytes], newFileName, {
-        type: 'application/pdf'
-      });
+      
+      // Validate that pdfBytes is a proper Uint8Array
+      if (!(pdfBytes instanceof Uint8Array)) {
+        throw new Error('PDF bytes are not in the correct format');
+      }
+      
+      let processedFile;
+      try {
+        processedFile = new File([pdfBytes], newFileName, {
+          type: 'application/pdf'
+        });
+      } catch (fileError) {
+        console.error('[PDFProcessor] Error creating File object:', fileError);
+        // Fallback: try creating a Blob instead
+        try {
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+          processedFile = new File([blob], newFileName, {
+            type: 'application/pdf'
+          });
+        } catch (blobError) {
+          console.error('[PDFProcessor] Error creating Blob object:', blobError);
+          throw new Error(`Failed to create downloadable file: ${fileError.message || blobError.message}`);
+        }
+      }
+      
+      // Validate created file
+      if (!processedFile || processedFile.size === 0) {
+        throw new Error('Processed file is empty or invalid');
+      }
       
       // Estimate compression savings
       const savings = this.estimateCompression(file.size, processedFile.size);
+      
+      console.log(`[PDFProcessor] Processed file - Original: ${file.size} bytes, Processed: ${processedFile.size} bytes`);
       
       return {
         originalFile: file,
@@ -703,6 +806,52 @@ export class PDFProcessor {
     }
     
     return true;
+  }
+
+  /**
+   * Load a PDF file and extract metadata
+   * @param {File} file - The PDF file to load
+   * @returns {Promise<Object>} - Object containing PDF document and metadata
+   */
+  async loadPDF(file) {
+    try {
+      console.log('[PDFProcessor] Loading PDF file:', file.name);
+      
+      // Initialize libraries if not already initialized
+      if (!this.PDFLib || !this.pdfjsLib) {
+        const initialized = await this.initialize();
+        if (!initialized) {
+          throw new Error('PDF libraries not available');
+        }
+      }
+      
+      // Validate PDF file
+      if (!this.validatePDF(file)) {
+        throw new Error('Invalid PDF file');
+      }
+      
+      // Convert File to ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Load PDF document using pdf-lib
+      const pdfDoc = await this.PDFLib.PDFDocument.load(arrayBuffer, { 
+        updateMetadata: false
+      });
+      
+      // Extract metadata
+      const metadata = this.extractMetadata(pdfDoc, file);
+      
+      console.log('[PDFProcessor] PDF loaded successfully');
+      
+      return {
+        pdfDoc,
+        metadata,
+        arrayBuffer
+      };
+    } catch (error) {
+      console.error('[PDFProcessor] Error loading PDF:', error);
+      throw new Error(`Failed to load PDF: ${error.message}`);
+    }
   }
 
   /**

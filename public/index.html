@@ -4,24 +4,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#6930c3">
-    <meta name="description" content="PDF Compressor PWA - Compress your PDF files locally in your browser without uploading them to any server">
+    <meta name="description" content="PDF Compressor - Compress your PDF files locally in your browser without uploading them to any server">
     
-    <title>PDF Compressor PWA</title>
+    <title>PDF Compressor</title>
     
-    <link rel="stylesheet" href="./css/styles.css">
-    <link rel="stylesheet" href="./css/responsive.css">
+    <!-- HtmlWebpackPlugin will inject CSS files here -->
     
     <!-- Manifest -->
     <link rel="manifest" href="./manifest.json">
     
     <!-- Icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="./assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/svg+xml" sizes="192x192" href="./assets/icons/icon-192x192.svg">
+    <link rel="apple-touch-icon" sizes="192x192" href="./assets/icons/icon-192x192.svg">
     
     <!-- iOS Safari -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="PDF Compressor PWA">
+    <meta name="apple-mobile-web-app-title" content="PDF Compressor">
+    
+    <!-- Preconnect do CDN dla szybszego ładowania -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
+    <!-- Lazy loading bibliotek PDF -->
+    <script>
+      // Funkcja do dynamicznego ładowania skryptów
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      // Lazy load bibliotek tylko gdy potrzebne
+      window.loadPDFLibraries = async function() {
+        if (window.PDFLib && window.pdfjsLib) return;
+        
+        try {
+          // Pokaż loading indicator
+          if (window.showLoadingLibraries) window.showLoadingLibraries();
+          
+          // Ładuj równolegle
+          await Promise.all([
+            !window.PDFLib && loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'),
+            !window.pdfjsLib && loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
+          ]);
+          
+          // Ustaw worker dla pdf.js
+          if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          }
+          
+          // Ukryj loading indicator
+          if (window.hideLoadingLibraries) window.hideLoadingLibraries();
+          
+          return true;
+        } catch (error) {
+          console.error('Failed to load PDF libraries:', error);
+          // Fallback do lokalnych bibliotek
+          return false;
+        }
+      };
+    </script>
+    
+    <style>
+      .spinner {
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 10px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #6930c3;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
 </head>
 <body>
     <!-- PWA Installation Banner (hidden by default) -->
@@ -35,21 +99,33 @@
     <div id="offlineNotification" class="offline-notification" style="display: none;">
         <p>You are currently offline. Some features may be limited.</p>
     </div>
+    
+    <!-- Library loading indicator -->
+    <div id="library-loader" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
+      <div class="spinner"></div>
+      <p>Ładowanie bibliotek PDF...</p>
+    </div>
 
-    <header>
-        <div class="logo">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8.5 18H10.5V21H8.5V18Z" fill="#6930c3"/>
-                <path d="M13.5 18H15.5V21H13.5V18Z" fill="#6930c3"/>
-                <path d="M2 11V3H22V11H2Z" fill="#6930c3"/>
-                <path d="M2 21V14H22V21H2Z" fill="#6930c3"/>
-                <path d="M4 19H6V16H4V19Z" fill="white"/>
-                <path d="M18 19H20V16H18V19Z" fill="white"/>
-                <path d="M9 5H15V7H9V5Z" fill="white"/>
-                <path d="M9 16H15V18H9V16Z" fill="white"/>
+    <header class="header">
+        <div class="header-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 12h6m-3-3v6m5 5H7a2 2 0 01-2-2V6a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V18a2 2 0 01-2 2z"/>
+                <path d="M13 3v5a1 1 0 001 1h5"/>
             </svg>
+            <span>PDF Compressor</span>
         </div>
-        <h1>PDF Compressor PWA</h1>
+        
+        <div class="header-controls">
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3m16.24-6.24l-4.24 4.24m-6 6l-4.24 4.24m0-10.48l4.24 4.24m6 6l4.24 4.24"/>
+                </svg>
+                <svg class="moon-icon" style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                </svg>
+            </button>
+        </div>
     </header>
     
     <main>
@@ -96,11 +172,7 @@
                     <!-- Compression Tab -->
                     <div class="tab-pane active" id="compressionTab">
                         <div class="option-item">
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="imageCompressionToggle" checked>
-                                <label for="imageCompressionToggle" class="toggle-label">
-                                    <span class="toggle-slider"></span>
-                                </label>
+                            <div class="option-header">
                                 <span class="option-label">Image Compression</span>
                             </div>
                             <div class="slider-container">
@@ -113,11 +185,7 @@
                     <!-- Removal Tab -->
                     <div class="tab-pane" id="removalTab">
                         <div class="option-item">
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="removeImagesToggle">
-                                <label for="removeImagesToggle" class="toggle-label">
-                                    <span class="toggle-slider"></span>
-                                </label>
+                            <div class="option-header">
                                 <span class="option-label">Remove Images</span>
                             </div>
                         </div>
@@ -126,11 +194,7 @@
                     <!-- Split Tab -->
                     <div class="tab-pane" id="splitTab">
                         <div class="option-item">
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="splitToggle">
-                                <label for="splitToggle" class="toggle-label">
-                                    <span class="toggle-slider"></span>
-                                </label>
+                            <div class="option-header">
                                 <span class="option-label">Split PDF</span>
                             </div>
                             <div class="split-options">
@@ -190,29 +254,61 @@
         </div>
     </main>
     
-    <footer>
-        <p>&copy; 2023 PDF Compressor PWA. All processing happens locally in your browser.</p>
+    <footer class="footer">
+        <img src="./assets/bart_ex.png" alt="Bart Ex Logo" class="footer-logo">
     </footer>
     
-    <!-- CDN fallback for pdf-lib and pdf.js -->
-    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+    <!-- HtmlWebpackPlugin will inject JS files here -->
     
-    <!-- Service Worker Registration -->
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
-                    .then(registration => {
-                        console.log('Service Worker registered with scope:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.log('Service Worker registration failed:', error);
-                    });
-            });
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        const sunIcon = themeToggle.querySelector('.sun-icon');
+        const moonIcon = themeToggle.querySelector('.moon-icon');
+        const htmlElement = document.documentElement;
+        
+        // Check for saved theme preference or default to light
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        htmlElement.setAttribute('data-theme', currentTheme);
+        updateThemeIcons(currentTheme);
+        
+        // Toggle theme
+        themeToggle.addEventListener('click', () => {
+            const theme = htmlElement.getAttribute('data-theme');
+            const newTheme = theme === 'light' ? 'dark' : 'light';
+            
+            htmlElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcons(newTheme);
+        });
+        
+        function updateThemeIcons(theme) {
+            if (theme === 'dark') {
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            } else {
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            }
         }
+        
+        // Check system preference
+        if (!localStorage.getItem('theme')) {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark) {
+                htmlElement.setAttribute('data-theme', 'dark');
+                updateThemeIcons('dark');
+            }
+        }
+        
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                const newTheme = e.matches ? 'dark' : 'light';
+                htmlElement.setAttribute('data-theme', newTheme);
+                updateThemeIcons(newTheme);
+            }
+        });
     </script>
-    
-    <script src="../src/js/app.js"></script>
 </body>
 </html>

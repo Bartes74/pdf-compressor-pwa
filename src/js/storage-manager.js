@@ -139,12 +139,11 @@ export class StorageManager {
       if (!this.db) {
         throw new Error('Database not initialized');
       }
+      // Convert file to ArrayBuffer BEFORE opening a transaction to avoid auto-commit
+      const arrayBuffer = await file.arrayBuffer();
       
       const transaction = this.db.transaction(['files'], 'readwrite');
       const store = transaction.objectStore('files');
-      
-      // Convert file to ArrayBuffer for storage
-      const arrayBuffer = await file.arrayBuffer();
       
       const fileData = {
         id: this.generateId(),
@@ -156,7 +155,18 @@ export class StorageManager {
         dateAdded: new Date()
       };
       
-      await this.putInStore(store, fileData);
+      try {
+        await this.putInStore(store, fileData);
+      } catch (e) {
+        // Retry once if transaction might have auto-closed
+        if (e && (e.name === 'InvalidStateError' || /transaction has finished/i.test(e.message))) {
+          const retryTx = this.db.transaction(['files'], 'readwrite');
+          const retryStore = retryTx.objectStore('files');
+          await this.putInStore(retryStore, fileData);
+        } else {
+          throw e;
+        }
+      }
       console.log(`[StorageManager] File saved: ${file.name}`);
       return fileData.id;
     } catch (error) {
@@ -296,13 +306,12 @@ export class StorageManager {
       if (!this.db) {
         throw new Error('Database not initialized');
       }
+      // Convert files to ArrayBuffer BEFORE opening a transaction to avoid auto-commit
+      const originalArrayBuffer = await result.originalFile.arrayBuffer();
+      const processedArrayBuffer = await result.processedFile.arrayBuffer();
       
       const transaction = this.db.transaction(['results'], 'readwrite');
       const store = transaction.objectStore('results');
-      
-      // Convert files to ArrayBuffer for storage
-      const originalArrayBuffer = await result.originalFile.arrayBuffer();
-      const processedArrayBuffer = await result.processedFile.arrayBuffer();
       
       const resultData = {
         id: this.generateId(),
@@ -324,7 +333,18 @@ export class StorageManager {
         dateProcessed: new Date()
       };
       
-      await this.putInStore(store, resultData);
+      try {
+        await this.putInStore(store, resultData);
+      } catch (e) {
+        // Retry once if transaction might have auto-closed
+        if (e && (e.name === 'InvalidStateError' || /transaction has finished/i.test(e.message))) {
+          const retryTx = this.db.transaction(['results'], 'readwrite');
+          const retryStore = retryTx.objectStore('results');
+          await this.putInStore(retryStore, resultData);
+        } else {
+          throw e;
+        }
+      }
       console.log('[StorageManager] Result saved');
       return resultData.id;
     } catch (error) {

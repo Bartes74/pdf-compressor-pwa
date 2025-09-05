@@ -3,6 +3,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const WebpackPwaManifest = require('webpack-pwa-manifest');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 module.exports = {
   entry: {
@@ -14,6 +15,10 @@ module.exports = {
     filename: '[name].[contenthash].js',
     clean: true,
     assetModuleFilename: 'assets/[hash][ext][query]'
+  },
+  externals: {
+    'pdf-lib': 'PDFLib',
+    'pdfjs-dist': 'pdfjsLib'
   },
   module: {
     rules: [
@@ -71,9 +76,9 @@ module.exports = {
     new CopyWebpackPlugin({
       patterns: [
         { from: 'public/manifest.json', to: 'manifest.json' },
-        { from: 'public/service-worker.js', to: 'service-worker.js' },
         { from: 'public/offline.html', to: 'offline.html' },
-        { from: 'src/assets/icons', to: 'assets/icons' }
+        { from: 'src/assets/icons', to: 'assets/icons' },
+        { from: 'src/assets/bart_ex.png', to: 'assets/bart_ex.png' }
       ]
     }),
     new WebpackPwaManifest({
@@ -93,16 +98,32 @@ module.exports = {
     }),
     new MiniCssExtractPlugin({
       filename: '[name].[contenthash].css'
+    }),
+    new BundleAnalyzerPlugin({
+      analyzerMode: process.env.ANALYZE ? 'server' : 'disabled'
     })
   ],
   optimization: {
     splitChunks: {
       chunks: 'all',
       cacheGroups: {
-        vendor: {
+        pdfLib: {
+          test: /[\\/]node_modules[\\/](pdf-lib|pdfjs-dist)[\\/]/,
+          name: 'pdf-libs',
+          priority: 10,
+          reuseExistingChunk: true
+        },
+        vendors: {
           test: /[\\/]node_modules[\\/]/,
           name: 'vendors',
-          chunks: 'all'
+          priority: -10,
+          reuseExistingChunk: true
+        },
+        styles: {
+          name: 'styles',
+          type: 'css/mini-extract',
+          chunks: 'all',
+          enforce: true
         }
       }
     },

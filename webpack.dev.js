@@ -10,11 +10,11 @@ module.exports = merge(common, {
       directory: path.join(__dirname, 'dist'),
     },
     compress: true,
-    port: 3000,
+    port: 3003,
     hot: true,
     open: true,
     historyApiFallback: true,
-    https: true, // Required for PWA testing
+    server: 'https',
     proxy: {
       // Example proxy configuration
       '/api': {
@@ -25,9 +25,12 @@ module.exports = merge(common, {
     }
   },
   performance: {
-    hints: 'warning',
-    maxAssetSize: 1000000, // 1MB
-    maxEntrypointSize: 1000000 // 1MB
+    hints: process.env.NODE_ENV === 'production' ? 'warning' : false,
+    maxEntrypointSize: 512000,
+    maxAssetSize: 512000,
+    assetFilter: function(assetFilename) {
+      return !assetFilename.endsWith('.pdf');
+    }
   },
   stats: {
     assets: true,

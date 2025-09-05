@@ -1,3 +1,4 @@
+import { UIController } from './ui-controller.js';
 // Loading indicators
 window.showLoadingLibraries = function() {
   const loader = document.getElementById('library-loader');
@@ -114,9 +115,6 @@ class PDFCompressorApp {
     // Initialize UI controller
     this.uiController = new UIController();
     
-    // Set reference to app in UI controller
-    this.uiController.setApp(this);
-    
     // Setup event listeners
     this.setupEventListeners();
   }
@@ -156,26 +154,17 @@ class PDFCompressorApp {
         return;
       }
       
-      // Set current file in state and show basic info immediately
+      // Ensure PDF libraries are loaded
+      await this.ensurePDFLibrariesLoaded();
+      
+      // Set current file in state
       this.state.currentFile = file;
-      this.uiController.showFileInfo({
-        fileName: file.name,
-        fileSize: file.size,
-        pageCount: 'Calculating...',
-        imageCount: 'Analyzing...'
-      });
       
-      // Ensure PDF libraries are loaded (with graceful error)
-      try {
-        await this.ensurePDFLibrariesLoaded();
-      } catch (e) {
-        this.showErrorMessage(e.message || 'Nie można załadować bibliotek PDF.');
-        return;
-      }
-      
-      // Load PDF document and update detailed metadata
+      // Load PDF document
       const result = await this.pdfProcessor.loadPDF(file);
       this.state.pdfDocument = result.pdfDoc;
+      
+      // Show file info in UI
       this.uiController.showFileInfo(result.metadata);
       
       console.log(`[PDFCompressor] File loaded: ${file.name}`);
@@ -183,35 +172,6 @@ class PDFCompressorApp {
       console.error('[PDFCompressor] Error handling file:', error);
       this.showErrorMessage('Error loading file: ' + error.message);
     }
-  }
-
-  /**
-   * Validate selected file
-   * @param {File} file
-   * @returns {boolean}
-   */
-  validateFile(file) {
-    if (!file) {
-      this.showErrorMessage('Nie wybrano pliku.');
-      return false;
-    }
-    // Only PDFs
-    const isPdf = file.type === 'application/pdf' || (file.name && file.name.toLowerCase().endsWith('.pdf'));
-    if (!isPdf) {
-      this.showErrorMessage('Obsługiwane są tylko pliki PDF.');
-      return false;
-    }
-    // Basic size checks (0 < size <= 500MB)
-    const maxBytes = 500 * 1024 * 1024;
-    if (file.size === 0) {
-      this.showErrorMessage('Plik jest pusty (0 B).');
-      return false;
-    }
-    if (file.size > maxBytes) {
-      this.showErrorMessage('Plik jest zbyt duży. Maksymalny rozmiar to 500 MB.');
-      return false;
-    }
-    return true;
   }
 
   /**
@@ -235,23 +195,13 @@ class PDFCompressorApp {
    * Process the current PDF with selected options
    */
   async processPDF() {
+    if (!this.state.currentFile || !this.state.pdfDocument) {
+      this.showErrorMessage('No PDF file selected');
+      return;
+    }
+    
     try {
-      // Ensure there is a file selected
-      if (!this.state.currentFile) {
-        this.showErrorMessage('No PDF file selected');
-        return;
-      }
-      
-      // If PDF not yet parsed, load it now
-      if (!this.state.pdfDocument) {
-        await this.ensurePDFLibrariesLoaded();
-        const result = await this.pdfProcessor.loadPDF(this.state.currentFile);
-        this.state.pdfDocument = result.pdfDoc;
-        // Update UI with detailed metadata (page count, etc.)
-        this.uiController.showFileInfo(result.metadata);
-      }
-      
-      // Ensure libraries are loaded (idempotent)
+      // Ensure PDF libraries are loaded
       await this.ensurePDFLibrariesLoaded();
       
       this.state.isProcessing = true;
@@ -259,32 +209,11 @@ class PDFCompressorApp {
       // Start performance tracking
       this.startPerformanceTracking();
       
-      // Show progress UI
-      this.uiController.showProgress();
-      
-      // Hook progress callback
-      const progressCallback = (p) => {
-        const percent = typeof p === 'number' ? p : (p && p.percentage) || 0;
-        const message = (p && p.message) || `Processing... ${percent}%`;
-        this.uiController.updateProgress(percent, message);
-      };
-      
       // Process PDF based on options
       const result = await this.pdfProcessor.processPDF(
         this.state.currentFile,
-        this.state.processingOptions,
-        progressCallback
+        this.state.processingOptions
       );
-      
-      // Validate result
-      if (!result || !result.processedFile) {
-        throw new Error('PDF processing returned invalid result');
-      }
-      
-      // Validate file sizes
-      if (result.processedFile.size === 0) {
-        throw new Error('Processed file is empty (0 bytes)');
-      }
       
       // End performance tracking
       this.endPerformanceTracking();
@@ -360,6 +289,17 @@ class PDFCompressorApp {
       console.error('[PDFCompressor] Error accessing PDF libraries:', error);
       throw new Error('Failed to access PDF processing libraries');
     }
+  }
+
+  /**
+   * Initialize core components (without PDF libraries yet)
+   */
+  async initializeCoreComponents() {
+    // Initialize storage manager dynamically
+    this.storageManager = await this.getStorageManager();
+    
+    // Initialize UI controller
+    this.uiController = new UIController();
   }
 
   /**
@@ -466,7 +406,6 @@ class PDFCompressorApp {
   }
 
   /**
-/**
    * Setup PWA features
    */
   setupPWAFeatures() {
@@ -547,6 +486,28 @@ class PDFCompressorApp {
     } else {
       this.uiController.showOfflineMode();
     }
+  }
+
+  /**
+   * Validate selected file
+   * @param {File} file - The file to validate
+   * @returns {boolean} True if file is valid
+   */
+  validateFile(file) {
+    // Check file type
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      this.showErrorMessage('Please select a valid PDF file');
+      return false;
+    }
+    
+    // Check file size (max 500MB)
+    const maxSize = 500 * 1024 * 1024; // 500MB in bytes
+    if (file.size > maxSize) {
+      this.showErrorMessage(`File size exceeds 500MB limit. Selected file: ${this.formatFileSize(file.size)}`);
+      return false;
+    }
+    
+    return true;
   }
 
   /**
@@ -695,9 +656,7 @@ class PDFCompressorApp {
 
 // Initialize the app when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[PDFCompressor] DOM Content Loaded, initializing app...');
   window.pdfCompressorApp = new PDFCompressorApp();
-  console.log('[PDFCompressor] App initialized:', window.pdfCompressorApp);
 });
 
 // Export for potential use in other modules

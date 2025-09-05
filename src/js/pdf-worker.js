@@ -261,8 +261,7 @@ async function compressImagesInWorker(data) {
     // Load PDF document
     reportProgress(taskId, 0, 'Loading PDF document');
     const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes, { 
-      updateMetadata: false,
-      parseSpeed: 'fast'
+      updateMetadata: false
     });
     
     // Get all pages
@@ -316,7 +315,7 @@ async function removeImagesInWorker(data) {
     
     // Load PDF document
     reportProgress(taskId, 0, 'Loading PDF document');
-    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes, { updateMetadata: false });
     
     // Get all pages
     const pages = pdfDoc.getPages();
@@ -370,7 +369,7 @@ async function splitPDFInWorker(data) {
     
     // Load PDF document
     reportProgress(taskId, 0, 'Loading PDF document');
-    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes, { updateMetadata: false });
     
     // Validate page range
     const pageCount = pdfDoc.getPageCount();
@@ -544,3 +543,6 @@ postMessage({
 });
 
 console.log('[PDFWorker] Worker initialized and ready');
+
+// Export default for worker-loader compatibility
+export default null;

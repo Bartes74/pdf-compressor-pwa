@@ -41,8 +41,6 @@ module.exports = (env, argv) => {
       }),
       new CopyWebpackPlugin({
         patterns: [
-          { from: 'public/manifest.json', to: 'manifest.json' },
-          { from: 'public/service-worker.js', to: 'service-worker.js' },
           { from: 'public/offline.html', to: 'offline.html' },
           { from: 'src/assets/icons', to: 'assets/icons' }
         ],

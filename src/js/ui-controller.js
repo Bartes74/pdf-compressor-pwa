@@ -5,7 +5,7 @@
  * UIController - Singleton class for managing the user interface
  * Handles all UI interactions, animations, and state management
  */
-class UIController {
+export class UIController {
   /**
    * Constructor - Initialize UIController as singleton
    */
@@ -17,6 +17,9 @@ class UIController {
     
     // DOM element cache
     this.elements = {};
+    
+    // Reference to main app
+    this.app = null;
     
     // State management
     this.state = {
@@ -57,6 +60,12 @@ class UIController {
     
     // Handle initial responsive state
     this.handleResize();
+
+    // Initialize processing options based on the active tab
+    const activeTab = Array.from(this.elements.tabs || []).find(t => t.classList.contains('active'));
+    if (activeTab) {
+      this.applyActiveTabOptions(activeTab.getAttribute('data-tab'));
+    }
   }
 
   /**
@@ -78,11 +87,8 @@ class UIController {
     // Option panel elements
     this.elements.tabs = document.querySelectorAll('.tab');
     this.elements.tabPanes = document.querySelectorAll('.tab-pane');
-    this.elements.imageCompressionToggle = document.getElementById('imageCompressionToggle');
     this.elements.qualitySlider = document.getElementById('qualitySlider');
     this.elements.qualityValue = document.getElementById('qualityValue');
-    this.elements.removeImagesToggle = document.getElementById('removeImagesToggle');
-    this.elements.splitToggle = document.getElementById('splitToggle');
     this.elements.splitByPages = document.getElementById('splitByPages');
     this.elements.splitBySize = document.getElementById('splitBySize');
     this.elements.pageRange = document.getElementById('pageRange');
@@ -331,16 +337,23 @@ class UIController {
    * @param {File} file - Selected file
    */
   processSelectedFile(file) {
-    // In a real implementation, this would trigger app processing
+    // Call the actual app to process the file
     console.log('[UIController] File selected:', file.name);
+    console.log('[UIController] App reference:', this.app);
     
-    // Show file info (mock data for now)
-    this.showFileInfo({
-      fileName: file.name,
-      fileSize: file.size,
-      pageCount: Math.floor(Math.random() * 100) + 1,
-      imageCount: Math.floor(Math.random() * 20) + 1
-    });
+    if (this.app) {
+      console.log('[UIController] Calling app.handleFileSelection');
+      this.app.handleFileSelection(file);
+    } else {
+      console.warn('[UIController] No app reference available for file processing');
+      // Fallback to mock data if app is not available
+      this.showFileInfo({
+        fileName: file.name,
+        fileSize: file.size,
+        pageCount: Math.floor(Math.random() * 100) + 1,
+        imageCount: Math.floor(Math.random() * 20) + 1
+      });
+    }
   }
 
   // === OPTIONS PANEL ===
@@ -354,6 +367,8 @@ class UIController {
     this.elements.tabs.forEach(tab => {
       tab.addEventListener('click', () => {
         this.switchTab(tab);
+        const tabId = tab.getAttribute('data-tab');
+        this.applyActiveTabOptions(tabId);
       });
     });
   }
@@ -382,97 +397,97 @@ class UIController {
   }
 
   /**
-   * Setup option controls
+   * Apply processing options based on active tab
+   * @param {string} tabId - 'compression' | 'removal' | 'split'
    */
-  setupOptionControls() {
-    // Image compression toggle
-    if (this.elements.imageCompressionToggle) {
-      this.elements.imageCompressionToggle.addEventListener('change', (e) => {
-        this.toggleOption('imageCompression', e.target.checked);
+  applyActiveTabOptions(tabId) {
+    if (!this.app) return;
+    if (tabId === 'compression') {
+      this.app.updateProcessingOptions({
+        imageCompression: true,
+        removeImages: false,
+        splitPDF: false
+      });
+    } else if (tabId === 'removal') {
+      this.app.updateProcessingOptions({
+        imageCompression: false,
+        removeImages: true,
+        splitPDF: false
+      });
+    } else if (tabId === 'split') {
+      let method = 'pages';
+      if (this.elements.splitBySize && this.elements.splitBySize.checked) method = 'size';
+      if (this.elements.splitByPages && this.elements.splitByPages.checked) method = 'pages';
+      this.app.updateProcessingOptions({
+        imageCompression: false,
+        removeImages: false,
+        splitPDF: true,
+        splitMethod: method
       });
     }
+  }
+
+  /**
+   * Setup option controls event listeners
+   */
+  setupOptionControls() {
+    console.log('[UIController] Setting up option controls');
     
     // Quality slider
     if (this.elements.qualitySlider && this.elements.qualityValue) {
       this.elements.qualitySlider.addEventListener('input', (e) => {
-        this.updateQualitySlider(e.target.value);
-      });
-    }
-    
-    // Remove images toggle
-    if (this.elements.removeImagesToggle) {
-      this.elements.removeImagesToggle.addEventListener('change', (e) => {
-        this.toggleOption('removeImages', e.target.checked);
-      });
-    }
-    
-    // Split toggle
-    if (this.elements.splitToggle) {
-      this.elements.splitToggle.addEventListener('change', (e) => {
-        this.toggleOption('splitPDF', e.target.checked);
-        this.toggleSplitControls(e.target.checked);
+        this.elements.qualityValue.textContent = e.target.value;
+        if (this.app) {
+          const quality = Math.max(10, Math.min(100, Number(e.target.value)));
+          this.app.updateProcessingOptions({ imageQuality: quality });
+        }
       });
     }
     
     // Split method radio buttons
-    if (this.elements.splitByPages && this.elements.splitBySize) {
+    if (this.elements.splitByPages) {
       this.elements.splitByPages.addEventListener('change', () => {
-        this.updateSplitControls('pages');
-      });
-      
-      this.elements.splitBySize.addEventListener('change', () => {
-        this.updateSplitControls('size');
+        this.showSplitInput('pages');
+        if (this.app) {
+          this.app.updateProcessingOptions({ splitMethod: 'pages' });
+        }
       });
     }
     
+    if (this.elements.splitBySize) {
+      this.elements.splitBySize.addEventListener('change', () => {
+        this.showSplitInput('size');
+        if (this.app) {
+          this.app.updateProcessingOptions({ splitMethod: 'size' });
+        }
+      });
+    }
+
     // Page range input
     if (this.elements.pageRange) {
-      this.elements.pageRange.addEventListener('input', () => {
-        this.validateInputs();
+      this.elements.pageRange.addEventListener('input', (e) => {
+        if (this.app) {
+          this.app.updateProcessingOptions({ pageRange: String(e.target.value || '').trim() });
+        }
       });
     }
     
     // File size limit input
     if (this.elements.fileSizeLimit) {
-      this.elements.fileSizeLimit.addEventListener('input', () => {
-        this.validateInputs();
+      this.elements.fileSizeLimit.addEventListener('input', (e) => {
+        if (this.app) {
+          const val = Math.max(1, Math.min(500, Number(e.target.value)));
+          this.app.updateProcessingOptions({ fileSizeLimit: val });
+        }
       });
     }
   }
 
   /**
-   * Toggle option
-   * @param {string} optionName - Name of the option to toggle
-   * @param {boolean} value - New value for the option
-   */
-  toggleOption(optionName, value) {
-    console.log(`[UIController] Toggling option ${optionName} to ${value}`);
-    
-    // In a real implementation, this would update app state
-    // For now, we'll just log the change
-    
-    // Trigger animation
-    this.triggerAnimation(`option-${optionName}-toggle`);
-  }
-
-  /**
-   * Update quality slider value display
-   * @param {string} value - Slider value
-   */
-  updateQualitySlider(value) {
-    if (this.elements.qualityValue) {
-      this.elements.qualityValue.textContent = value;
-    }
-    
-    // Trigger animation
-    this.triggerAnimation('quality-slider-update');
-  }
-
-  /**
-   * Update split controls based on method
+   * Show split input based on selected method
    * @param {string} method - Split method ('pages' or 'size')
    */
-  updateSplitControls(method) {
+  showSplitInput(method) {
     if (!this.elements.pagesInput || !this.elements.sizeInput) return;
     
     if (method === 'pages') {
@@ -482,53 +497,6 @@ class UIController {
       this.elements.pagesInput.style.display = 'none';
       this.elements.sizeInput.style.display = 'block';
     }
-    
-    // Trigger animation
-    this.triggerAnimation('split-controls-update');
-  }
-
-  /**
-   * Toggle split controls visibility
-   * @param {boolean} visible - Whether to show split controls
-   */
-  toggleSplitControls(visible) {
-    const splitOptions = document.querySelector('.split-options');
-    if (splitOptions) {
-      splitOptions.style.display = visible ? 'block' : 'none';
-    }
-  }
-
-  /**
-   * Validate input fields
-   * @returns {boolean} - Whether inputs are valid
-   */
-  validateInputs() {
-    let isValid = true;
-    
-    // Validate page range (if visible)
-    if (this.elements.pageRange && this.elements.pageRange.offsetParent !== null) {
-      const pageRange = this.elements.pageRange.value;
-      // Simple validation - in real app, this would be more thorough
-      if (pageRange && !/^\d+-\d+$/.test(pageRange)) {
-        isValid = false;
-        this.elements.pageRange.classList.add('invalid');
-      } else {
-        this.elements.pageRange.classList.remove('invalid');
-      }
-    }
-    
-    // Validate file size limit (if visible)
-    if (this.elements.fileSizeLimit && this.elements.fileSizeLimit.offsetParent !== null) {
-      const fileSizeLimit = parseInt(this.elements.fileSizeLimit.value);
-      if (isNaN(fileSizeLimit) || fileSizeLimit < 1 || fileSizeLimit > 500) {
-        isValid = false;
-        this.elements.fileSizeLimit.classList.add('invalid');
-      } else {
-        this.elements.fileSizeLimit.classList.remove('invalid');
-      }
-    }
-    
-    return isValid;
   }
 
   // === PROGRESS MANAGEMENT ===
@@ -596,6 +564,25 @@ class UIController {
     // Hide progress
     this.hideProgress();
     
+    // Validate files object
+    if (!files || !files.processedFile) {
+      console.error('[UIController] Invalid files object for results:', files);
+      this.showNotification('Processing failed - invalid result data', 'error');
+      return;
+    }
+    
+    // Validate file sizes
+    if (files.originalFile && files.processedFile) {
+      console.log(`[UIController] File sizes - Original: ${files.originalFile.size}, Processed: ${files.processedFile.size}`);
+      
+      // Check for potential issues with large files
+      if (files.originalFile.size > 100 * 1024 * 1024 && files.processedFile.size < 1024) {
+        // Original file is >100MB but processed file is <1KB - likely an error
+        console.warn('[UIController] Potential issue: Large original file but very small processed file');
+        this.showNotification('Warning: Processed file seems unusually small. There may have been an error during processing.', 'warning');
+      }
+    }
+    
     // Show results section
     this.elements.resultsSection.style.display = 'block';
     
@@ -613,18 +600,38 @@ class UIController {
         ` (${files.savings.savingsPercentage}% reduction)`;
     }
     
-    // Setup download handlers
+    // Setup download handlers with error handling
     if (this.elements.originalDownload) {
+      // Remove any existing event listeners to prevent duplicates
+      const clone = this.elements.originalDownload.cloneNode(true);
+      this.elements.originalDownload.parentNode.replaceChild(clone, this.elements.originalDownload);
+      this.elements.originalDownload = clone;
+      
       this.elements.originalDownload.addEventListener('click', (e) => {
         e.preventDefault();
-        this.handleDownload(files.originalFile);
+        try {
+          this.handleDownload(files.originalFile);
+        } catch (error) {
+          console.error('[UIController] Error downloading original file:', error);
+          this.showNotification('Failed to download original file: ' + error.message, 'error');
+        }
       });
     }
     
     if (this.elements.compressedDownload) {
+      // Remove any existing event listeners to prevent duplicates
+      const clone = this.elements.compressedDownload.cloneNode(true);
+      this.elements.compressedDownload.parentNode.replaceChild(clone, this.elements.compressedDownload);
+      this.elements.compressedDownload = clone;
+      
       this.elements.compressedDownload.addEventListener('click', (e) => {
         e.preventDefault();
-        this.handleDownload(files.processedFile);
+        try {
+          this.handleDownload(files.processedFile);
+        } catch (error) {
+          console.error('[UIController] Error downloading processed file:', error);
+          this.showNotification('Failed to download processed file: ' + error.message, 'error');
+        }
       });
     }
     
@@ -659,24 +666,40 @@ class UIController {
    * @param {File} file - File to download
    */
   handleDownload(file) {
-    if (!file) return;
+    if (!file) {
+      console.error('[UIController] No file provided for download');
+      this.showNotification('No file to download', 'error');
+      return;
+    }
     
-    // Create download link
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
+    // Validate file object
+    if (!(file instanceof File) && !(file instanceof Blob)) {
+      console.error('[UIController] Invalid file object for download:', file);
+      this.showNotification('Invalid file object', 'error');
+      return;
+    }
     
-    // Clean up
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-    
-    // Trigger animation
-    this.triggerAnimation('file-download');
+    try {
+      // Create download link
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name || 'download.pdf';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+      
+      // Trigger animation
+      this.triggerAnimation('file-download');
+    } catch (error) {
+      console.error('[UIController] Error creating download link:', error);
+      this.showNotification('Failed to create download link. File may be corrupted.', 'error');
+    }
   }
 
   /**
@@ -1024,26 +1047,33 @@ class UIController {
    */
   handleProcess() {
     console.log('[UIController] Process button clicked');
+    console.log('[UIController] App reference:', this.app);
     
-    // Show progress
-    this.showProgress();
-    
-    // Simulate processing
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 5;
-      this.updateProgress(progress, `Processing... ${progress}%`);
+    if (this.app) {
+      console.log('[UIController] Calling app.processPDF');
+      this.app.processPDF();
+    } else {
+      console.warn('[UIController] No app reference available for processing');
+      // Fallback simulation if app is not available
+      this.showProgress();
       
-      if (progress >= 100) {
-        clearInterval(interval);
-        // In a real implementation, this would show actual results
-        this.showResults({
-          originalFile: { size: 1000000, name: 'original.pdf' },
-          processedFile: { size: 700000, name: 'compressed.pdf' },
-          savings: { savingsBytes: 300000, savingsPercentage: '30.00' }
-        });
-      }
-    }, 100);
+      // Simulate processing
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 5;
+        this.updateProgress(progress, `Processing... ${progress}%`);
+        
+        if (progress >= 100) {
+          clearInterval(interval);
+          // In a real implementation, this would show actual results
+          this.showResults({
+            originalFile: { size: 1000000, name: 'original.pdf' },
+            processedFile: { size: 700000, name: 'compressed.pdf' },
+            savings: { savingsBytes: 300000, savingsPercentage: '30.00' }
+          });
+        }
+      }, 100);
+    }
   }
 
   /**
@@ -1060,8 +1090,16 @@ class UIController {
     // Trigger animation
     this.triggerAnimation('app-reset');
   }
+
+  /**
+   * Set reference to main app
+   * @param {Object} app - Reference to the main PDFCompressorApp instance
+   */
+  setApp(app) {
+    console.log('[UIController] Setting app reference:', app);
+    this.app = app;
+  }
 }
 
-// Export singleton instance
-const uiController = new UIController();
-export { uiController as UIController };
+// Note: The class `UIController` is exported above and instantiated by the app.
+// Avoid exporting another symbol named `UIController` to prevent duplicate export errors.

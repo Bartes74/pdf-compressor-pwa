@@ -21,18 +21,18 @@
     font-size: 14px;
   }
   
-  header {
+  .header {
     padding: 0.5rem;
     flex-direction: column;
     text-align: center;
   }
   
-  header .logo {
+  .header .logo {
     margin-right: 0;
     margin-bottom: 0.5rem;
   }
   
-  header h1 {
+  .header h1 {
     font-size: 1.2rem;
   }
   
@@ -262,11 +262,11 @@
     font-size: 15px;
   }
   
-  header {
+  .header {
     padding: 0.75rem 1rem;
   }
   
-  header h1 {
+  .header h1 {
     font-size: 1.4rem;
   }
   
@@ -369,11 +369,11 @@
     font-size: 16px;
   }
   
-  header {
+  .header {
     padding: 1rem 1.5rem;
   }
   
-  header h1 {
+  .header h1 {
     font-size: 1.6rem;
   }
   
@@ -521,6 +521,108 @@
   
   .result-item {
     padding: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .header-title {
+    font-size: 1.2rem;
+  }
+  
+  .header-title svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .container {
+    margin: 1rem;
+    border-radius: 12px;
+  }
+  
+  .upload-area {
+    margin: 1rem;
+    padding: 2rem;
+  }
+  
+  .footer {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+  
+  .footer-logo {
+    height: 24px;
+  }
+  
+  .footer-text {
+    font-size: 0.8rem;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-title span {
+    font-size: 1.1rem;
+  }
+  
+  .theme-toggle {
+    padding: 0.4rem;
+  }
+  
+  .theme-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* High contrast mode dla dostępności */
+@media (prefers-contrast: high) {
+  [data-theme="light"] {
+    --border: #000000;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+  }
+  
+  [data-theme="dark"] {
+    --border: #FFFFFF;
+    --text-primary: #FFFFFF;
+    --text-secondary: #CCCCCC;
+    --surface: #000000;
+    --surface-elevated: #1a1a1a;
+  }
+}
+
+/* Reduced motion dla dostępności */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .header,
+  .footer,
+  .theme-toggle,
+  .upload-area,
+  .btn {
+    display: none !important;
+  }
+  
+  .container {
+    box-shadow: none;
+    margin: 0;
+  }
+  
+  body {
+    background: white;
+    color: black;
   }
 }
 

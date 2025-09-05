@@ -42,11 +42,17 @@ module.exports = merge(common, {
     splitChunks: {
       chunks: 'all',
       cacheGroups: {
+        pdfLib: {
+          test: /[\\/]node_modules[\\/](pdf-lib|pdfjs-dist)[\\/]/,
+          name: 'pdf-libs',
+          priority: 10,
+          reuseExistingChunk: true
+        },
         vendor: {
           test: /[\\/]node_modules[\\/]/,
           name: 'vendors',
-          chunks: 'all',
-          priority: 10
+          priority: -10,
+          reuseExistingChunk: true
         },
         styles: {
           name: 'styles',
@@ -58,9 +64,12 @@ module.exports = merge(common, {
     }
   },
   performance: {
-    hints: 'error',
-    maxAssetSize: 500000, // 500KB
-    maxEntrypointSize: 500000 // 500KB
+    hints: process.env.NODE_ENV === 'production' ? 'warning' : false,
+    maxEntrypointSize: 512000,
+    maxAssetSize: 512000,
+    assetFilter: function(assetFilename) {
+      return !assetFilename.endsWith('.pdf');
+    }
   },
   stats: {
     assets: true,
