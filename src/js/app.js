@@ -258,13 +258,21 @@ class PDFCompressorApp {
    */
   async ensurePDFLibrariesLoaded() {
     if (!this.pdfLibrariesLoaded) {
+      // Desktop: użyj lokalnych modułów zamiast CDN
+      if (typeof window !== 'undefined' && window.desktop) {
+        const pdfLibModule = await import('pdf-lib');
+        // Wyrównaj do formatu używanego w reszcie aplikacji
+        window.PDFLib = pdfLibModule;
+        this.pdfLibrariesLoaded = true;
+        const { PDFProcessor } = await import('./pdf-processor.js');
+        this.pdfProcessor = new PDFProcessor();
+        return;
+      }
+      // Przeglądarka: CDN loader
       this.pdfLibrariesLoaded = await window.loadPDFLibraries();
-      
       if (!this.pdfLibrariesLoaded) {
         throw new Error('Nie można załadować bibliotek PDF. Sprawdź połączenie internetowe.');
       }
-      
-      // Dynamically import PDF processor
       const { PDFProcessor } = await import('./pdf-processor.js');
       this.pdfProcessor = new PDFProcessor();
     }
@@ -393,17 +401,44 @@ class PDFCompressorApp {
             left.appendChild(sizeEl);
             const actions = document.createElement('div');
             actions.className = 'split-result-actions';
-            const a = document.createElement('a');
-            a.className = 'button-download';
-            const url = URL.createObjectURL(item.data);
-            a.href = url;
-            a.download = item.name;
-            a.textContent = 'Download';
-            actions.appendChild(a);
+            if (window.desktop && typeof window.desktop.chooseDirectory === 'function') {
+              const btn = document.createElement('button');
+              btn.className = 'button-download';
+              btn.textContent = 'Save';
+              btn.addEventListener('click', async () => {
+                const dir = await window.desktop.chooseDirectory();
+                if (!dir) return;
+                await window.desktop.saveFiles(dir, [ { name: item.name, data: await item.data.arrayBuffer() } ]);
+              });
+              actions.appendChild(btn);
+            } else {
+              const a = document.createElement('a');
+              a.className = 'button-download';
+              const url = URL.createObjectURL(item.data);
+              a.href = url;
+              a.download = item.name;
+              a.textContent = 'Download';
+              actions.appendChild(a);
+            }
             row.appendChild(left);
             row.appendChild(actions);
             wrap.appendChild(row);
           });
+          if (window.desktop && typeof window.desktop.chooseDirectory === 'function') {
+            const bulk = document.createElement('div');
+            bulk.style.textAlign = 'right';
+            const btnAll = document.createElement('button');
+            btnAll.className = 'button-download';
+            btnAll.textContent = 'Save All';
+            btnAll.addEventListener('click', async () => {
+              const dir = await window.desktop.chooseDirectory();
+              if (!dir) return;
+              const files = await Promise.all(list.map(async it => ({ name: it.name, data: await it.data.arrayBuffer() })));
+              await window.desktop.saveFiles(dir, files);
+            });
+            bulk.appendChild(btnAll);
+            container.appendChild(bulk);
+          }
           container.appendChild(wrap);
         }
       } else {
