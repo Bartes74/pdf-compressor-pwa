@@ -1,4 +1,5 @@
 import { createLegacyEngine } from './legacy-engine.js';
+import { createEnhancedEngine } from './enhanced-engine.js';
 
 function getEngineNameFromEnv() {
   // URL param has priority
@@ -18,6 +19,5 @@ function getEngineNameFromEnv() {
 export function createEngine(app) {
   const name = getEngineNameFromEnv();
   console.log(`[Engine] Selected engine: ${name}`);
-  // For now only legacy is implemented
-  return createLegacyEngine(app);
+  return name === 'enhanced' ? createEnhancedEngine(app) : createLegacyEngine(app);
 }

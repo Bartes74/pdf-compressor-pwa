@@ -974,4 +974,17 @@ export class PDFProcessor {
       console.log('[PDFProcessor] Web Worker terminated');
     }
   }
+
+  async removeImagesPreserveText(pdfDoc) {
+    try {
+      console.log('[PDFProcessor] removeImagesPreserveText: starting (non-destructive stub)');
+      // NOTE: This is a safe no-op placeholder to keep text intact and avoid corrupting PDFs.
+      // Next steps (M2): walk page resources, identify Image XObjects and strip their invocations
+      // from content streams without rasterizing text.
+      return pdfDoc;
+    } catch (error) {
+      console.warn('[PDFProcessor] removeImagesPreserveText failed, returning original document:', error);
+      return pdfDoc;
+    }
+  }
 }
