@@ -989,17 +989,22 @@ export class PDFProcessor {
       const page = await pdf.getPage(i);
       const opList = await page.getOperatorList();
       let count = 0;
+      const names = [];
       for (let j = 0; j < opList.fnArray.length; j++) {
         const fn = opList.fnArray[j];
+        const args = opList.argsArray[j];
         if (
           fn === OPS.paintImageXObject ||
           fn === OPS.paintInlineImageXObject ||
           fn === OPS.paintImageXObjectRepeat
         ) {
           count += 1;
+          if (args && args[0] && typeof args[0] === 'string') {
+            names.push(args[0]);
+          }
         }
       }
-      result.push({ page: i, imageOps: count });
+      result.push({ page: i, imageOps: count, names });
     }
     return result;
   }

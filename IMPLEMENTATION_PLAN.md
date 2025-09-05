@@ -19,17 +19,17 @@
 - [x] Repo GitHub (prywatne) + CI (Actions: build na push/PR)
 
 ### M1: Feature flag + interfejs silnika
-- [ ] Wprowadzić flagę `engine` (localStorage + query) i logowanie wybranego trybu
-- [ ] Dodać `PdfEngine` (interfejs): `compress({quality})`, `removeImages()`, `split({method, pageCount?|sizeMB?})`
-- [ ] Wyodrębnić aktualną ścieżkę do `legacyEngine` (status quo)
-- [ ] Przełączyć `app.processPDF()` przez `engine`, domyślnie `legacy`
+- [x] Wprowadzić flagę `engine` (localStorage + query) i logowanie wybranego trybu
+- [x] Dodać `PdfEngine` (interfejs): `compress({quality})`, `removeImages()`, `split({method, pageCount?|sizeMB?})` (warstwa selektora)
+- [x] Wyodrębnić aktualną ścieżkę do `legacyEngine` (status quo)
+- [x] Przełączyć `app.processPDF()` przez `engine`, domyślnie `legacy`
 
 ### M2: Removal bez rasteryzacji (zachowanie tekstu)
-- [ ] Odczytać słownik zasobów stron (`/Resources`), zmapować XObject-y obrazów
-- [ ] Sparsować strumienie treści i usuwać wywołania `Do /<ImageName>` (bez dotykania operatorów tekstu)
-- [ ] Oczyścić nieużywane wpisy XObject w `/Resources`
-- [ ] Zapisać i ręcznie zweryfikować na próbkach (tekst pozostaje, rozmiar maleje)
-- [ ] Zaoszczędzić zmiany za flagą `enhanced`; przygotować fallback do `legacy`
+- [x] (krok 1) Analiza operatorów: policzyć operacje obrazów per strona (pdf.js `getOperatorList`), log-only
+- [ ] (krok 2) Zbierać nazwy XObject (Do /<ImgName>) per strona – przygotowanie do usuwania
+- [ ] (krok 3) Usunięcie wywołań `Do /<ImgName>` w strumieniu treści dla 1 strony (za flagą)
+- [ ] (krok 4) Rozszerzenie na wszystkie strony + czyszczenie nieużywanych XObject w `/Resources`
+- [ ] (krok 5) Weryfikacja ręczna na próbkach (tekst pozostaje, rozmiar maleje) i fallback do `legacy` przy błędach
 
 ### M3: Compression bez rasteryzacji tekstu
 - [ ] Zlokalizować strumienie obrazów (Image XObject) i ich parametry (`/ColorSpace`, `/Filter`, `/BitsPerComponent`)
