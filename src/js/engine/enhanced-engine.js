@@ -30,12 +30,42 @@ export function createEnhancedEngine(app) {
 
       // Split if requested
       if (options.splitPDF) {
-        if (options.splitMethod === 'pages' && options.pageRange) {
-          const [start, end] = options.pageRange.split('-').map(Number);
-          processedDoc = await app.pdfProcessor.splitByPages(processedDoc, start, end);
+        if (options.splitMethod === 'pages') {
+          // Interpret pageRange: either "start-end" (legacy) or a single integer for fixed pages per file
+          const txt = String(options.pageRange || '').trim();
+          if (/^\d+-\d+$/.test(txt)) {
+            const [start, end] = txt.split('-').map(Number);
+            processedDoc = await app.pdfProcessor.splitByPages(processedDoc, start, end);
+          } else {
+            const pagesPerChunk = Math.max(1, Number(txt) || 10);
+            const parts = await app.pdfProcessor.splitByPagesFixed(processedDoc, pagesPerChunk, progressCallback);
+            // Save all parts to bytes
+            const files = [];
+            let idx = 1;
+            for (const doc of parts) {
+              const bytes = await doc.save({ useObjectStreams: true, addDefaultPage: false, compress: true });
+              const padded = String(idx).padStart(3, '0');
+              const base = (options.baseName || app.pdfProcessor.generateFileName(file.name, options)).replace(/\.pdf$/i, '');
+              const name = `${base}-part-${padded}.pdf`;
+              files.push(new File([bytes], name, { type: 'application/pdf' }));
+              idx += 1;
+            }
+            return { originalFile: file, processedFile: files[0], files, metadata, savings: app.pdfProcessor.estimateCompression(file.size, files.reduce((s,f)=>s+f.size,0)), processingTime: Date.now() };
+          }
         } else if (options.splitMethod === 'size') {
           const chunks = await app.pdfProcessor.splitBySize(processedDoc, options.fileSizeLimit, progressCallback);
-          processedDoc = chunks[0];
+          // Save all chunks
+          const files = [];
+          let idx = 1;
+          for (const doc of chunks) {
+            const bytes = await doc.save({ useObjectStreams: true, addDefaultPage: false, compress: true });
+            const padded = String(idx).padStart(3, '0');
+            const base = (options.baseName || app.pdfProcessor.generateFileName(file.name, options)).replace(/\.pdf$/i, '');
+            const name = `${base}-part-${padded}.pdf`;
+            files.push(new File([bytes], name, { type: 'application/pdf' }));
+            idx += 1;
+          }
+          return { originalFile: file, processedFile: files[0], files, metadata, savings: app.pdfProcessor.estimateCompression(file.size, files.reduce((s,f)=>s+f.size,0)), processingTime: Date.now() };
         }
       }
 

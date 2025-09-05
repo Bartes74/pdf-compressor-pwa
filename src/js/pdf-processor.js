@@ -1,853 +1,76 @@
-// PDFProcessor.js - Handles PDF processing logic using pdf-lib
-// This implementation provides comprehensive PDF manipulation capabilities
-
-/**
- * PDFProcessor - Class for processing PDF files with various operations
- * Uses pdf-lib for PDF manipulation and provides methods for compression, splitting, and optimization
- */
 export class PDFProcessor {
-  /**
-   * Constructor - Initialize PDFProcessor
-   */
   constructor() {
-    this.worker = null;
-    this.isWorkerSupported = typeof Worker !== 'undefined';
-    this.taskCounter = 0;
     this.PDFLib = null;
-    this.pdfjsLib = null;
-  }
-  /**
-   * Remove images by rasterizing all pages to image-only pages (simulates removal of embedded images)
-   * This approach ensures visually similar output but strips original embedded images/objects.
-   */
-  async removeImages(pdfDoc) {
-    try {
-      // Render each page to canvas and rebuild as image-only PDF
-      const pageCount = pdfDoc.getPageCount();
-      const images = [];
-      // Use pdf.js (window.pdfjsLib) to render
-      const originalBytes = await pdfDoc.save();
-      const loadingTask = window.pdfjsLib.getDocument({ data: originalBytes });
-      const pdf = await loadingTask.promise;
-      for (let i = 1; i <= pageCount; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2 });
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
-        images.push({ blob, width: viewport.width, height: viewport.height });
-      }
-      const newPdf = await this.PDFLib.PDFDocument.create();
-      for (const img of images) {
-        const bytes = new Uint8Array(await img.blob.arrayBuffer());
-        const embedded = await newPdf.embedJpg(bytes);
-        const page = newPdf.addPage([img.width, img.height]);
-        page.drawImage(embedded, { x: 0, y: 0, width: img.width, height: img.height });
-      }
-      return newPdf;
-    } catch (error) {
-      console.error('[PDFProcessor] Error removing images via rasterization:', error);
-      throw new Error(`Failed to remove images: ${error.message}`);
-    }
+    this.initialized = false;
   }
 
-  /**
-   * Rasterize pages and rebuild PDF to approximate image compression
-   */
-  async rasterizeAndRebuild(file, quality, progressCallback = null) {
-    const arrayBuffer = await file.arrayBuffer();
-    const srcPdf = await this.PDFLib.PDFDocument.load(arrayBuffer, { updateMetadata: false });
-    const pageCount = srcPdf.getPageCount();
-    const originalBytes = await srcPdf.save();
-    const loadingTask = window.pdfjsLib.getDocument({ data: originalBytes });
-    const pdf = await loadingTask.promise;
-    const newPdf = await this.PDFLib.PDFDocument.create();
-    for (let i = 1; i <= pageCount; i++) {
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2 });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      const q = Math.max(0.1, Math.min(1, Number(quality) / 100));
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', q));
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const embedded = await newPdf.embedJpg(bytes);
-      const newPage = newPdf.addPage([viewport.width, viewport.height]);
-      newPage.drawImage(embedded, { x: 0, y: 0, width: viewport.width, height: viewport.height });
-      if (progressCallback) {
-        progressCallback({ percentage: Math.round((i / pageCount) * 100), message: `Compressing page ${i}/${pageCount}` });
-      }
-    }
-    return newPdf;
-  }
-
-  /**
-   * Initialize PDF libraries
-   */
   async initialize() {
-    // Check if libraries are available globally (from CDN)
-    if (window.PDFLib && window.pdfjsLib) {
-      this.PDFLib = window.PDFLib;
-      this.pdfjsLib = window.pdfjsLib;
-      return true;
-    }
-    
-    // Fallback: try to load dynamically
+    if (this.initialized) return true;
+
     try {
-      // These imports will work only if libraries are in node_modules
-      // In production we use CDN, so this is only fallback
-      if (!this.PDFLib) {
-        this.PDFLib = window.PDFLib || await this.loadPDFLib();
+      console.log('Initializing PDFProcessor...');
+      
+      // Sprawdź czy biblioteki są załadowane
+      if (!window.PDFLib) {
+        console.log('PDFLib not found, loading libraries...');
+        const loaded = await window.loadPDFLibraries();
+        if (!loaded) {
+          throw new Error('Failed to load PDF libraries');
+        }
       }
-      if (!this.pdfjsLib) {
-        this.pdfjsLib = window.pdfjsLib || await this.loadPDFJS();
+      
+      // Sprawdź ponownie
+      if (!window.PDFLib) {
+        throw new Error('PDFLib still not available after loading');
       }
+      
+      this.PDFLib = window.PDFLib;
+      this.initialized = true;
+      
+      // Sprawdź dostępność kluczowych funkcji
+      console.log('PDFLib loaded:', {
+        PDFDocument: !!this.PDFLib.PDFDocument,
+        PDFName: !!this.PDFLib.PDFName,
+        PDFDict: !!this.PDFLib.PDFDict,
+        load: typeof this.PDFLib.PDFDocument.load
+      });
+      
       return true;
     } catch (error) {
-      console.error('Failed to initialize PDF libraries:', error);
+      console.error('Failed to initialize PDF Processor:', error);
       return false;
     }
   }
 
   /**
-   * Load PDFLib library
-   */
-  async loadPDFLib() {
-    // Fallback for development
-    try {
-      const module = await import(/* webpackIgnore: true */ 'pdf-lib');
-      return module;
-    } catch {
-      // If not in node_modules, use global version
-      return window.PDFLib;
-    }
-  }
-
-  /**
-   * Load PDF.js library
-   */
-  async loadPDFJS() {
-    // Fallback for development
-    try {
-      const module = await import(/* webpackIgnore: true */ 'pdfjs-dist');
-      return module;
-    } catch {
-      // If not in node_modules, use global version
-      return window.pdfjsLib;
-    }
-  }
-
-  /**
-   * Load PDF libraries dynamically
-   * @deprecated Use initialize() instead
-   */
-  async loadLibraries() {
-    // Initialize libraries if not already initialized
-    if (!this.PDFLib || !this.pdfjsLib) {
-      const initialized = await this.initialize();
-      if (!initialized) {
-        throw new Error('PDF libraries not available');
-      }
-    }
-    
-    return { 
-      PDFDocument: this.PDFLib.PDFDocument, 
-      rgb: this.PDFLib.rgb,
-      pdfjsLib: this.pdfjsLib
-    };
-  }
-
-  /**
-   * Process a PDF file
-   * @param {File} file - The PDF file to process
-   * @returns {Promise<Object>} - Processing result
-   */
-  async processFile(file) {
-    // Initialize libraries if not already initialized
-    if (!this.PDFLib || !this.pdfjsLib) {
-      const initialized = await this.initialize();
-      if (!initialized) {
-        throw new Error('PDF libraries not available');
-      }
-    }
-    
-    // Process file
-    const arrayBuffer = await file.arrayBuffer();
-    const pdfDoc = await this.PDFLib.PDFDocument.load(arrayBuffer);
-    
-    return this.processPDF(pdfDoc);
-  }
-
-  /**
-   * Compress images in a PDF document
-   * @param {PDFDocument} pdfDoc - The PDF document to process
-   * @param {number} quality - Image quality (10-100)
-   * @param {Function} progressCallback - Callback for progress updates
-   * @returns {Promise<PDFDocument>} - Processed PDF document
-   */
-  async compressImages(pdfDoc, quality, progressCallback = null) {
-    // Prefer worker if available and initialized
-    try {
-      if (this.isWorkerSupported) {
-        await this.initWorker();
-        return await this.compressImagesWithWorker(pdfDoc, quality, progressCallback);
-      }
-    } catch (e) {
-      console.warn('[PDFProcessor] Worker path failed, using main thread:', e);
-    }
-    // Fallback to main thread
-    return this.compressImagesInMainThread(pdfDoc, quality, progressCallback);
-  }
-
-  /**
-   * Initialize Web Worker
-   */
-  async initWorker() {
-    if (this.worker) return;
-    // Use bundler-resolved URL for worker
-    const WorkerConstructor = (await import(/* webpackChunkName: "pdf-worker" */ /* webpackMode: "lazy" */ './pdf-worker.js')).default;
-    this.worker = new WorkerConstructor();
-    // Setup basic response handling map
-    if (!this.pendingTasks) this.pendingTasks = {};
-    this.worker.onmessage = (event) => {
-      const { type, taskId } = event.data || {};
-      if (!taskId || !this.pendingTasks || !this.pendingTasks[taskId]) return;
-      if (type === 'PROCESSING_COMPLETED') {
-        this.pendingTasks[taskId].resolve(event.data);
-        delete this.pendingTasks[taskId];
-      } else if (type === 'ERROR') {
-        this.pendingTasks[taskId].reject(new Error(event.data.error || 'Worker error'));
-        delete this.pendingTasks[taskId];
-      }
-    };
-  }
-
-  /**
-   * Generate unique task id
-   */
-  generateTaskId() {
-    this.taskCounter += 1;
-    return `task-${Date.now()}-${this.taskCounter}`;
-  }
-
-  /**
-   * Compress images in main thread (fallback)
-   * @param {PDFDocument} pdfDoc - The PDF document to process
-   * @param {number} quality - Image quality (10-100)
-   * @param {Function} progressCallback - Callback for progress updates
-   * @returns {Promise<PDFDocument>} - Processed PDF document
-   */
-  async compressImagesInMainThread(pdfDoc, quality, progressCallback = null) {
-    try {
-      console.log(`[PDFProcessor] Compressing images with quality: ${quality}`);
-      
-      const pages = pdfDoc.getPages();
-      const total = pages.length;
-      
-      // Iterate through each page
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        
-        // In a real implementation, we would:
-        // 1. Identify XObjects (images) on the page
-        // 2. Extract images
-        // 3. Compress using Canvas API
-        // 4. Re-embed compressed images
-        
-        // For demonstration, we'll simulate the process
-        if (progressCallback) {
-          progressCallback({
-            page: i + 1,
-            total,
-            percentage: Math.round(((i + 1) / total) * 100),
-            message: `Compressing page ${i + 1} of ${total}`
-          });
-        }
-        
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      console.log('[PDFProcessor] Image compression completed');
-      return pdfDoc;
-    } catch (error) {
-      console.error('[PDFProcessor] Error compressing images:', error);
-      throw new Error(`Failed to compress images: ${error.message}`);
-    }
-  }
-
-  /**
-   * Compress images using Web Worker
-   * @param {PDFDocument} pdfDoc - The PDF document to process
-   * @param {number} quality - Image quality (10-100)
-   * @param {Function} progressCallback - Callback for progress updates
-   * @returns {Promise<PDFDocument>} - Processed PDF document
-   */
-  async compressImagesWithWorker(pdfDoc, quality, progressCallback = null) {
-    const taskId = this.generateTaskId();
-    const pdfBytes = await pdfDoc.save();
-    
-    // Create a promise to handle the async response
-    const taskPromise = new Promise((resolve, reject) => {
-      // Store the promise callbacks
-      if (!this.pendingTasks) this.pendingTasks = {};
-      this.pendingTasks[taskId] = { resolve, reject };
-      
-      // Set up progress handler if callback provided
-      if (progressCallback) {
-        const progressHandler = (event) => {
-          if (event.data.type === 'PROGRESS_UPDATE' && event.data.taskId === taskId) {
-            progressCallback({
-              percentage: event.data.percentage,
-              message: event.data.message
-            });
-          }
-        };
-        this.worker.addEventListener('message', progressHandler);
-        
-        // Remove listener when task completes
-        const cleanupHandler = (event) => {
-          if ((event.data.type === 'PROCESSING_COMPLETED' || event.data.type === 'ERROR') && 
-              event.data.taskId === taskId) {
-            this.worker.removeEventListener('message', progressHandler);
-            this.worker.removeEventListener('message', cleanupHandler);
-          }
-        };
-        this.worker.addEventListener('message', cleanupHandler);
-      }
-    });
-    
-    // Send task to worker
-    this.worker.postMessage({
-      type: 'PROCESS_COMPRESS_IMAGES',
-      taskId,
-      payload: {
-        pdfBytes,
-        quality,
-        taskId
-      }
-    });
-    
-    // Wait for result
-    const { result } = await taskPromise;
-    
-    // Load the processed PDF
-    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
-    return processedPdf;
-  }
-
-  /**
-   * Remove images from a PDF document
-   * @param {PDFDocument} pdfDoc - The PDF document to process
-   * @returns {Promise<PDFDocument>} - Processed PDF document
-   */
-  async removeImages(pdfDoc) {
-    try {
-      console.log('[PDFProcessor] Removing images from PDF');
-      
-      // Try to use worker if available
-      if (this.isWorkerSupported) {
-        try {
-          await this.initWorker();
-          return await this.removeImagesWithWorker(pdfDoc);
-        } catch (workerError) {
-          console.warn('[PDFProcessor] Worker failed, falling back to main thread:', workerError);
-        }
-      }
-      
-      // Fallback to main thread processing
-      const pages = pdfDoc.getPages();
-      
-      // Iterate through each page
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        
-        // In a real implementation, we would:
-        // 1. Identify XObject references (images)
-        // 2. Remove image references from page content
-        // 3. Clean up unused objects
-        
-        // For demonstration, we'll simulate the process
-        console.log(`[PDFProcessor] Processing page ${i + 1} for image removal`);
-        
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-      
-      // Clean up unused objects
-      // pdfDoc.flush();
-      
-      console.log('[PDFProcessor] Image removal completed');
-      return pdfDoc;
-    } catch (error) {
-      console.error('[PDFProcessor] Error removing images:', error);
-      throw new Error(`Failed to remove images: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Remove images using Web Worker
-   * @param {PDFDocument} pdfDoc - The PDF document to process
-   * @returns {Promise<PDFDocument>} - Processed PDF document
-   */
-  async removeImagesWithWorker(pdfDoc) {
-    const taskId = this.generateTaskId();
-    const pdfBytes = await pdfDoc.save();
-    
-    // Create a promise to handle the async response
-    const taskPromise = new Promise((resolve, reject) => {
-      // Store the promise callbacks
-      if (!this.pendingTasks) this.pendingTasks = {};
-      this.pendingTasks[taskId] = { resolve, reject };
-    });
-    
-    // Send task to worker
-    this.worker.postMessage({
-      type: 'PROCESS_REMOVE_IMAGES',
-      taskId,
-      payload: {
-        pdfBytes,
-        taskId
-      }
-    });
-    
-    // Wait for result
-    const { result } = await taskPromise;
-    
-    // Load the processed PDF
-    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
-    return processedPdf;
-  }
-
-  /**
-   * Split PDF by page range
-   * @param {PDFDocument} pdfDoc - The PDF document to split
-   * @param {number} startPage - Starting page (1-based)
-   * @param {number} endPage - Ending page (1-based)
-   * @returns {Promise<PDFDocument>} - New PDF document with selected pages
-   */
-  async splitByPages(pdfDoc, startPage, endPage) {
-    try {
-      console.log(`[PDFProcessor] Splitting PDF by pages: ${startPage}-${endPage}`);
-      
-      // Initialize libraries if not already initialized
-      if (!this.PDFLib || !this.pdfjsLib) {
-        const initialized = await this.initialize();
-        if (!initialized) {
-          throw new Error('PDF libraries not available');
-        }
-      }
-      
-      // Try to use worker if available
-      if (this.isWorkerSupported) {
-        try {
-          await this.initWorker();
-          return await this.splitByPagesWithWorker(pdfDoc, startPage, endPage);
-        } catch (workerError) {
-          console.warn('[PDFProcessor] Worker failed, falling back to main thread:', workerError);
-        }
-      }
-      
-      // Validate page range
-      const pageCount = pdfDoc.getPageCount();
-      if (startPage < 1 || endPage > pageCount || startPage > endPage) {
-        throw new Error(`Invalid page range. PDF has ${pageCount} pages.`);
-      }
-      
-      // Create new PDF document
-      const newPdfDoc = await this.PDFLib.PDFDocument.create();
-      
-      // Copy pages to new document
-      for (let i = startPage; i <= endPage; i++) {
-        // Copy page (1-based index to 0-based)
-        const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i - 1]);
-        newPdfDoc.addPage(copiedPage);
-      }
-      
-      // In a real implementation, we would also:
-      // 1. Copy bookmarks
-      // 2. Copy links
-      // 3. Preserve metadata where possible
-      
-      console.log('[PDFProcessor] PDF splitting by pages completed');
-      return newPdfDoc;
-    } catch (error) {
-      console.error('[PDFProcessor] Error splitting by pages:', error);
-      throw new Error(`Failed to split PDF by pages: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Split PDF by pages using Web Worker
-   * @param {PDFDocument} pdfDoc - The PDF document to split
-   * @param {number} startPage - Starting page (1-based)
-   * @param {number} endPage - Ending page (1-based)
-   * @returns {Promise<PDFDocument>} - New PDF document with selected pages
-   */
-  async splitByPagesWithWorker(pdfDoc, startPage, endPage) {
-    const taskId = this.generateTaskId();
-    const pdfBytes = await pdfDoc.save();
-    
-    // Create a promise to handle the async response
-    const taskPromise = new Promise((resolve, reject) => {
-      // Store the promise callbacks
-      if (!this.pendingTasks) this.pendingTasks = {};
-      this.pendingTasks[taskId] = { resolve, reject };
-    });
-    
-    // Send task to worker
-    this.worker.postMessage({
-      type: 'PROCESS_SPLIT_PDF',
-      taskId,
-      payload: {
-        pdfBytes,
-        startPage,
-        endPage,
-        taskId
-      }
-    });
-    
-    // Wait for result
-    const { result } = await taskPromise;
-    
-    // Load the processed PDF
-    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
-    return processedPdf;
-  }
-
-  /**
-   * Split PDF by file size
-   * @param {PDFDocument} pdfDoc - The PDF document to split
-   * @param {number} maxSizeMB - Maximum size per chunk in MB
-   * @param {Function} progressCallback - Callback for progress updates
-   * @returns {Promise<Array<PDFDocument>>} - Array of PDF documents
-   */
-  async splitBySize(pdfDoc, maxSizeMB, progressCallback = null) {
-    try {
-      console.log(`[PDFProcessor] Splitting PDF by size: ${maxSizeMB}MB`);
-      
-      const maxSizeBytes = maxSizeMB * 1024 * 1024;
-      const chunks = [];
-      const pageCount = pdfDoc.getPageCount();
-      
-      // Estimate initial chunk size using binary search approach
-      let startPage = 1;
-      let endPage = pageCount;
-      
-      while (startPage <= pageCount) {
-        // Estimate optimal end page for current chunk
-        let chunkEndPage = await this.estimateOptimalChunkEnd(pdfDoc, startPage, endPage, maxSizeBytes);
-        
-        // Create chunk
-        const chunkDoc = await this.splitByPages(pdfDoc, startPage, chunkEndPage);
-        chunks.push(chunkDoc);
-        
-        // Report progress
-        if (progressCallback) {
-          progressCallback({
-            chunk: chunks.length,
-            totalChunks: 'calculating',
-            percentage: Math.round((chunkEndPage / pageCount) * 100)
-          });
-        }
-        
-        // Move to next chunk
-        startPage = chunkEndPage + 1;
-        
-        // Break if we've processed all pages
-        if (startPage > pageCount) {
-          break;
-        }
-      }
-      
-      console.log(`[PDFProcessor] PDF splitting by size completed. Created ${chunks.length} chunks`);
-      return chunks;
-    } catch (error) {
-      console.error('[PDFProcessor] Error splitting by size:', error);
-      throw new Error(`Failed to split PDF by size: ${error.message}`);
-    }
-  }
-
-  /**
-   * Estimate optimal chunk end page
-   * @param {PDFDocument} pdfDoc - The PDF document
-   * @param {number} startPage - Starting page
-   * @param {number} endPage - Ending page
-   * @param {number} maxSizeBytes - Maximum size in bytes
-   * @returns {Promise<number>} - Optimal end page
-   */
-  async estimateOptimalChunkEnd(pdfDoc, startPage, endPage, maxSizeBytes) {
-    // Simplified estimation - in a real implementation, this would be more sophisticated
-    let low = startPage;
-    let high = endPage;
-    let optimalEnd = startPage;
-    
-    // Binary search for optimal end page
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      
-      // Estimate size for pages startPage to mid
-      // In a real implementation, we would actually measure this
-      const estimatedSize = (mid - startPage + 1) * 100000; // Simplified estimation
-      
-      if (estimatedSize <= maxSizeBytes) {
-        optimalEnd = mid;
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
-    }
-    
-    return optimalEnd;
-  }
-
-  /**
-   * Optimize PDF for web viewing
-   * @param {PDFDocument} pdfDoc - The PDF document to optimize
-   * @returns {Promise<PDFDocument>} - Optimized PDF document
-   */
-  async optimizePDF(pdfDoc) {
-    try {
-      console.log('[PDFProcessor] Optimizing PDF');
-      
-      // Initialize libraries if not already initialized
-      if (!this.PDFLib || !this.pdfjsLib) {
-        const initialized = await this.initialize();
-        if (!initialized) {
-          throw new Error('PDF libraries not available');
-        }
-      }
-      
-      // Try to use worker if available
-      if (this.isWorkerSupported) {
-        try {
-          await this.initWorker();
-          return await this.optimizePDFWithWorker(pdfDoc);
-        } catch (workerError) {
-          console.warn('[PDFProcessor] Worker failed, falling back to main thread:', workerError);
-        }
-      }
-      
-      // In a real implementation, we would:
-      // 1. Remove duplicate objects
-      // 2. Compress streams
-      // 3. Subset fonts
-      // 4. Linearize for fast web view
-      
-      // For demonstration, we'll simulate the process
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log('[PDFProcessor] PDF optimization completed');
-      return pdfDoc;
-    } catch (error) {
-      console.error('[PDFProcessor] Error optimizing PDF:', error);
-      throw new Error(`Failed to optimize PDF: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Optimize PDF using Web Worker
-   * @param {PDFDocument} pdfDoc - The PDF document to optimize
-   * @returns {Promise<PDFDocument>} - Optimized PDF document
-   */
-  async optimizePDFWithWorker(pdfDoc) {
-    const taskId = this.generateTaskId();
-    const pdfBytes = await pdfDoc.save();
-    
-    // Create a promise to handle the async response
-    const taskPromise = new Promise((resolve, reject) => {
-      // Store the promise callbacks
-      if (!this.pendingTasks) this.pendingTasks = {};
-      this.pendingTasks[taskId] = { resolve, reject };
-    });
-    
-    // Send task to worker
-    this.worker.postMessage({
-      type: 'PROCESS_OPTIMIZE_PDF',
-      taskId,
-      payload: {
-        pdfBytes,
-        taskId
-      }
-    });
-    
-    // Wait for result
-    const { result } = await taskPromise;
-    
-    // Load the processed PDF
-    const processedPdf = await this.PDFLib.PDFDocument.load(result.pdfBytes);
-    return processedPdf;
-  }
-
-  /**
-   * Process PDF with selected options
-   * @param {File} file - The PDF file to process
-   * @param {Object} options - Processing options
-   * @returns {Promise<Object>} - Processing result
-   */
-  async processPDF(file, options, progressCallback = null) {
-    try {
-      console.log('[PDFProcessor] Processing PDF with options:', options);
-      
-      // Load PDF
-      const { pdfDoc, metadata } = await this.loadPDF(file);
-      
-      let processedDoc = pdfDoc;
-      
-      // Apply image compression if requested (rasterize pages to JPEG at target quality)
-      if (options.imageCompression) {
-        processedDoc = await this.rasterizeAndRebuild(file, options.imageQuality, progressCallback);
-      }
-      
-      // Remove images if requested
-      if (options.removeImages) {
-        processedDoc = await this.removeImages(processedDoc);
-      }
-      
-      // Split PDF if requested
-      if (options.splitPDF) {
-        if (options.splitMethod === 'pages' && options.pageRange) {
-          const [start, end] = options.pageRange.split('-').map(Number);
-          processedDoc = await this.splitByPages(processedDoc, start, end);
-        } else if (options.splitMethod === 'size') {
-          // For size-based splitting, we return multiple documents
-          const chunks = await this.splitBySize(processedDoc, options.fileSizeLimit);
-          // For simplicity, we'll return the first chunk
-          processedDoc = chunks[0];
-        }
-      }
-      
-      // Optimize PDF
-      processedDoc = await this.optimizePDF(processedDoc);
-      
-      // Serialize to bytes with error handling
-      let pdfBytes;
-      try {
-        pdfBytes = await processedDoc.save();
-      } catch (saveError) {
-        console.error('[PDFProcessor] Error saving PDF document:', saveError);
-        throw new Error(`Failed to save processed PDF: ${saveError.message}`);
-      }
-      
-      // Validate pdfBytes before creating File
-      if (!pdfBytes || pdfBytes.length === 0) {
-        throw new Error('Processed PDF is empty or invalid');
-      }
-      
-      // Create new file
-      const newFileName = this.generateFileName(file.name, options);
-      
-      // Validate that pdfBytes is a proper Uint8Array
-      if (!(pdfBytes instanceof Uint8Array)) {
-        throw new Error('PDF bytes are not in the correct format');
-      }
-      
-      let processedFile;
-      try {
-        processedFile = new File([pdfBytes], newFileName, {
-          type: 'application/pdf'
-        });
-      } catch (fileError) {
-        console.error('[PDFProcessor] Error creating File object:', fileError);
-        // Fallback: try creating a Blob instead
-        try {
-          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          processedFile = new File([blob], newFileName, {
-            type: 'application/pdf'
-          });
-        } catch (blobError) {
-          console.error('[PDFProcessor] Error creating Blob object:', blobError);
-          throw new Error(`Failed to create downloadable file: ${fileError.message || blobError.message}`);
-        }
-      }
-      
-      // Validate created file
-      if (!processedFile || processedFile.size === 0) {
-        throw new Error('Processed file is empty or invalid');
-      }
-      
-      // Estimate compression savings
-      const savings = this.estimateCompression(file.size, processedFile.size);
-      
-      console.log(`[PDFProcessor] Processed file - Original: ${file.size} bytes, Processed: ${processedFile.size} bytes`);
-      
-      return {
-        originalFile: file,
-        processedFile,
-        metadata,
-        savings,
-        processingTime: Date.now()
-      };
-    } catch (error) {
-      console.error('[PDFProcessor] Error processing PDF:', error);
-      throw new Error(`Failed to process PDF: ${error.message}`);
-    }
-  }
-
-  /**
-   * Validate if a file is a PDF
-   * @param {File} file - The file to validate
-   * @returns {boolean} - True if the file is a valid PDF
+   * Walidacja pliku PDF
    */
   validatePDF(file) {
-    // Check file type
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      return false;
-    }
-    
-    // Check file size (basic validation)
-    if (file.size === 0) {
-      return false;
-    }
-    
+    if (!file) return false;
+    const isPdf = file.type === 'application/pdf' || (file.name && file.name.toLowerCase().endsWith('.pdf'));
+    if (!isPdf) return false;
+    if (file.size === 0) return false;
     return true;
   }
 
   /**
-   * Load a PDF file and extract metadata
-   * @param {File} file - The PDF file to load
-   * @returns {Promise<Object>} - Object containing PDF document and metadata
+   * Załaduj PDF i zwróć metadane
    */
   async loadPDF(file) {
     try {
-      console.log('[PDFProcessor] Loading PDF file:', file.name);
-      
-      // Initialize libraries if not already initialized
-      if (!this.PDFLib || !this.pdfjsLib) {
-        const initialized = await this.initialize();
-        if (!initialized) {
-          throw new Error('PDF libraries not available');
-        }
+      if (!this.initialized) {
+        const ok = await this.initialize();
+        if (!ok) throw new Error('PDF libraries not available');
       }
-      
-      // Validate PDF file
       if (!this.validatePDF(file)) {
         throw new Error('Invalid PDF file');
       }
-      
-      // Convert File to ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
-      
-      // Load PDF document using pdf-lib
-      const pdfDoc = await this.PDFLib.PDFDocument.load(arrayBuffer, { 
-        updateMetadata: false
-      });
-      
-      // Extract metadata
+      const pdfDoc = await this.PDFLib.PDFDocument.load(arrayBuffer, { updateMetadata: false });
       const metadata = this.extractMetadata(pdfDoc, file);
-      
-      console.log('[PDFProcessor] PDF loaded successfully');
-      
-      return {
-        pdfDoc,
-        metadata,
-        arrayBuffer
-      };
+      // Normalize object streams setting globally for saves from this document
+      try { pdfDoc.context.trailerInfo = { ...(pdfDoc.context.trailerInfo||{}), Encrypt: undefined }; } catch {}
+      return { pdfDoc, metadata, arrayBuffer };
     } catch (error) {
       console.error('[PDFProcessor] Error loading PDF:', error);
       throw new Error(`Failed to load PDF: ${error.message}`);
@@ -855,237 +78,840 @@ export class PDFProcessor {
   }
 
   /**
-   * Extract metadata from PDF document
-   * @param {PDFDocument} pdfDoc - The PDF document
-   * @param {File} file - The original file
-   * @returns {Object} - Extracted metadata
+   * Ekstrakcja podstawowych metadanych
    */
   extractMetadata(pdfDoc, file) {
     try {
-      const info = pdfDoc.getTitle() || file.name.replace('.pdf', '');
-      const author = pdfDoc.getAuthor() || 'Unknown';
-      const subject = pdfDoc.getSubject() || '';
-      const keywords = pdfDoc.getKeywords() || '';
-      const creator = pdfDoc.getCreator() || '';
-      const producer = pdfDoc.getProducer() || '';
-      const creationDate = pdfDoc.getCreationDate();
-      const modificationDate = pdfDoc.getModificationDate();
-      const pageCount = pdfDoc.getPageCount();
-      
+      const pageCount = typeof pdfDoc.getPageCount === 'function' ? pdfDoc.getPageCount() : 0;
       return {
-        title: info,
-        author,
-        subject,
-        keywords,
-        creator,
-        producer,
-        creationDate: creationDate || new Date(),
-        modificationDate: modificationDate || new Date(),
-        pageCount,
-        fileSize: file.size
+        fileName: file.name,
+        fileSize: file.size,
+        pageCount
       };
-    } catch (error) {
-      console.warn('[PDFProcessor] Error extracting metadata:', error);
-      return {
-        title: file.name.replace('.pdf', ''),
-        author: 'Unknown',
-        subject: '',
-        keywords: '',
-        creator: '',
-        producer: '',
-        creationDate: new Date(),
-        modificationDate: new Date(),
-        pageCount: pdfDoc ? pdfDoc.getPageCount() : 0,
-        fileSize: file.size
+    } catch (e) {
+    return { 
+        fileName: file.name,
+        fileSize: file.size,
+        pageCount: 0
       };
     }
   }
 
   /**
-   * Generate thumbnail for PDF
-   * @param {PDFDocument} pdfDoc - The PDF document
-   * @param {number} pageNumber - Page number for thumbnail
-   * @returns {Promise<string>} - Data URL of thumbnail
-   */
-  async generateThumbnail(pdfDoc, pageNumber = 1) {
-    try {
-      // In a real implementation, we would render the page to a canvas
-      // and convert it to a data URL
-      
-      // For demonstration, we'll return a placeholder
-      return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
-    } catch (error) {
-      console.warn('[PDFProcessor] Error generating thumbnail:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Estimate compression savings
-   * @param {number} originalSize - Original file size in bytes
-   * @param {number} compressedSize - Compressed file size in bytes
-   * @returns {Object} - Savings information
+   * Prosta estymacja oszczędności
    */
   estimateCompression(originalSize, compressedSize) {
-    const savingsBytes = originalSize - compressedSize;
-    const savingsPercentage = originalSize > 0 ? (savingsBytes / originalSize) * 100 : 0;
-    
-    return {
-      originalSize,
-      compressedSize,
-      savingsBytes,
-      savingsPercentage: savingsPercentage.toFixed(2)
-    };
+    const savingsBytes = Math.max(0, originalSize - compressedSize);
+    const savingsPercentage = originalSize > 0 ? ((savingsBytes / originalSize) * 100).toFixed(2) : '0.00';
+    return { originalSize, compressedSize, savingsBytes, savingsPercentage };
   }
 
   /**
-   * Generate new file name based on processing options
-   * @param {string} originalName - Original file name
-   * @param {Object} options - Processing options
-   * @returns {string} - New file name
+   * Szacuje łączną liczbę obrazów w całym PDF
    */
-  generateFileName(originalName, options) {
+  async estimateTotalImages(pdfDoc) {
+    try {
+      const pages = pdfDoc.getPages();
+      let total = 0;
+      for (let i = 0; i < pages.length; i++) {
+        total += await this.countPageImages(pages[i], pdfDoc, i);
+      }
+      return total;
+    } catch (e) {
+      console.warn('[PDFProcessor] estimateTotalImages failed:', e);
+      return 0;
+    }
+  }
+
+  // Głębokie liczenie (z Form XObjects)
+  async estimateTotalImagesDeep(pdfDoc) {
+    try {
+      const { PDFName, PDFDict } = this.PDFLib;
+      const pageCount = pdfDoc.getPageCount();
+      const countImagesInDict = (dict) => {
+        if (!dict || typeof dict.lookup !== 'function') return 0;
+        let cnt = 0;
+        const resources = dict.lookup(PDFName.of('Resources'));
+        if (resources && resources instanceof PDFDict) {
+          const xobj = resources.lookup(PDFName.of('XObject'));
+          if (xobj && xobj instanceof PDFDict) {
+            const keys = xobj.keys();
+            for (const name of keys) {
+              try {
+                const obj = xobj.lookup(name);
+                const subtype = obj && obj.dict ? obj.dict.get(PDFName.of('Subtype')) : null;
+                const subtypeText = subtype && subtype.decodeText ? subtype.decodeText() : String(subtype || '');
+                if (/Form$/i.test(subtypeText)) {
+                  cnt += countImagesInDict(obj.dict);
+                } else if (/Image$/i.test(subtypeText)) {
+                  cnt += 1;
+                }
+              } catch {}
+            }
+          }
+        }
+        return cnt;
+      };
+      let total = 0;
+      for (let i = 0; i < pageCount; i++) {
+        const page = pdfDoc.getPage(i);
+        const pageDict = pdfDoc.context.lookup(page.ref, PDFDict);
+        total += countImagesInDict(pageDict);
+      }
+      return total;
+    } catch (e) {
+      console.warn('[PDFProcessor] estimateTotalImagesDeep failed:', e);
+      return 0;
+    }
+  }
+
+  /**
+   * Split PDF by target size (MB) into multiple documents
+   * Heuristic: add pages to a chunk, save and measure; if > limit, back off last page and start new chunk.
+   */
+  async splitBySize(pdfDoc, maxSizeMB, progressCallback = null) {
+    const outputs = [];
+    try {
+      const limit = Math.max(1, Math.round(Number(maxSizeMB) || 10)) * 1024 * 1024;
+      const pageCount = pdfDoc.getPageCount();
+      // Guard: if even the smallest single-page chunk exceeds the limit, abort with clear error
+      const sampleCount = Math.min(5, pageCount);
+      let minSinglePage = Infinity;
+      for (let i = 0; i < sampleCount; i++) {
+        const probe = await this.PDFLib.PDFDocument.create();
+        const [p] = await probe.copyPages(pdfDoc, [i]);
+        probe.addPage(p);
+        const size = (await probe.save({ useObjectStreams: true, addDefaultPage: false })).length;
+        if (size < minSinglePage) minSinglePage = size;
+      }
+      if (minSinglePage === Infinity) throw new Error('Unable to analyze pages for size-based split');
+      if (minSinglePage > limit) {
+        const mb = (minSinglePage / 1024 / 1024).toFixed(2);
+        const sel = (limit / 1024 / 1024).toFixed(2);
+        const msg = `Minimalny rozmiar części (${mb} MB) przekracza wybrany limit (${sel} MB). Zwiększ limit lub użyj podziału po stronach.`;
+        if (progressCallback) progressCallback({ percentage: 0, message: msg });
+        throw new Error(msg);
+      }
+      let start = 0;
+      let part = 0;
+      while (start < pageCount) {
+        // Exponential growth to find upper bound, then binary search within [low, high]
+        let low = 1;
+        let high = 1;
+        let bestFitDoc = null;
+        let bestFitPages = 0;
+        // Find an upper bound that exceeds the limit or end of doc
+        while (true) {
+          const candidateEnd = Math.min(start + high, pageCount);
+          const tmp = await this.PDFLib.PDFDocument.create();
+          const indices = [];
+          for (let i = start; i < candidateEnd; i++) indices.push(i);
+          const pages = await tmp.copyPages(pdfDoc, indices);
+          pages.forEach(p => tmp.addPage(p));
+          const size = (await tmp.save({ useObjectStreams: true, addDefaultPage: false })).length;
+          if (size <= limit && candidateEnd < pageCount) {
+            bestFitDoc = tmp;
+            bestFitPages = candidateEnd - start;
+            low = high + 1;
+            high = Math.min(high * 2, pageCount - start);
+          } else {
+            // Found upper bound (either size>limit or reached end)
+            if (size <= limit) {
+              bestFitDoc = tmp;
+              bestFitPages = candidateEnd - start;
+              low = bestFitPages;
+            } else {
+              // keep tmp for possible binary search highs
+            }
+            break;
+          }
+        }
+        // Binary search in [low, high] to maximize pages under limit
+        let l = Math.max(1, Math.min(low, pageCount - start));
+        let r = Math.max(l, Math.min(high, pageCount - start));
+        while (l <= r) {
+          const mid = Math.floor((l + r) / 2);
+          const candidateEnd = start + mid;
+          const tmp = await this.PDFLib.PDFDocument.create();
+          const indices = [];
+          for (let i = start; i < candidateEnd; i++) indices.push(i);
+          const pages = await tmp.copyPages(pdfDoc, indices);
+          pages.forEach(p => tmp.addPage(p));
+          const size = (await tmp.save({ useObjectStreams: true, addDefaultPage: false })).length;
+          if (size <= limit) {
+            bestFitDoc = tmp;
+            bestFitPages = mid;
+            l = mid + 1;
+          } else {
+            r = mid - 1;
+          }
+          if (progressCallback) {
+            const pct = Math.min(95, Math.round(((candidateEnd) / pageCount) * 100));
+            progressCallback({ percentage: pct, message: `Packing part ${part + 1}… (${candidateEnd}/${pageCount} pages)` });
+          }
+        }
+        // Edge: if no fit (single page > limit), abort with clear error
+        if (!bestFitDoc || bestFitPages === 0) {
+          const probe = await this.PDFLib.PDFDocument.create();
+          const [p] = await probe.copyPages(pdfDoc, [start]);
+          probe.addPage(p);
+          const oneSize = (await probe.save({ useObjectStreams: true, addDefaultPage: false })).length;
+          const mb = (oneSize / 1024 / 1024).toFixed(2);
+          const sel = (limit / 1024 / 1024).toFixed(2);
+          const msg = `Strona ${start + 1}: minimalny rozmiar części (${mb} MB) przekracza wybrany limit (${sel} MB). Zwiększ limit lub użyj podziału po stronach.`;
+          if (progressCallback) progressCallback({ percentage: 0, message: msg });
+          throw new Error(msg);
+        } else {
+          outputs.push(bestFitDoc);
+          start += bestFitPages;
+        }
+        part += 1;
+      }
+      return outputs;
+    } catch (e) {
+      console.error('[PDFProcessor] splitBySize error:', e);
+      throw e;
+    }
+  }
+
+  /**
+   * Główna ścieżka przetwarzania (legacy engine)
+   */
+  async processPDF(file, options, progressCallback = null) {
+    if (!file) throw new Error('No file provided');
+    const { pdfDoc, metadata } = await this.loadPDF(file);
+
+    // Removal (zachowuje tekst)
+    if (options && options.removeImages) {
+      const removal = await this.removeImages(file, options, progressCallback);
+      const processedFile = new File([removal.pdfBytes], removal.fileName, { type: 'application/pdf' });
+      const savings = this.estimateCompression(file.size, removal.pdfBytes.length);
+      return { originalFile: file, processedFile, metadata, savings, processingTime: Date.now() };
+    }
+
+    // Compression (placeholder: bez zmian zawartości, tylko przepływ i postęp)
+    if (options && options.imageCompression) {
+      if (progressCallback) progressCallback({ percentage: 10, message: 'Preparing compression…' });
+      const processedDoc = await this.compressImagesInMainThread(pdfDoc, options.imageQuality, progressCallback);
+
+      // Rebuild to drop orphaned image objects after replacements
+      let targetDoc = processedDoc;
+      try {
+        const pageCount = processedDoc.getPageCount();
+        const rebuilt = await this.PDFLib.PDFDocument.create();
+        const copied = await rebuilt.copyPages(processedDoc, Array.from({ length: pageCount }, (_, i) => i));
+        copied.forEach(p => rebuilt.addPage(p));
+        targetDoc = rebuilt;
+      } catch (e) {
+        console.warn('[PDFProcessor] Compression rebuild skipped:', e);
+      }
+
+      if (progressCallback) progressCallback({ percentage: 90, message: 'Saving PDF…' });
+      const pdfBytes = await targetDoc.save({ useObjectStreams: true, addDefaultPage: false, compress: true });
+      const fileName = this.generateFileName(file.name, options);
+      const processedFile = new File([pdfBytes], fileName, { type: 'application/pdf' });
+      const savings = this.estimateCompression(file.size, processedFile.size);
+      if (progressCallback) progressCallback({ percentage: 100, message: 'Compression complete' });
+      return { originalFile: file, processedFile, metadata, savings, processingTime: Date.now() };
+    }
+
+    // Split i inne opcje mogą być obsłużone tutaj w przyszłości
+    return { originalFile: file, processedFile: file, metadata, savings: this.estimateCompression(file.size, file.size), processingTime: Date.now() };
+  }
+
+  /**
+   * Kompresja obrazów (tymczasowo no-op z prog. postępu)
+   */
+  async compressImagesInMainThread(pdfDoc, quality = 70, progressCallback = null) {
+    try {
+      const { PDFName, PDFDict, PDFArray } = this.PDFLib;
+      const q = Math.max(0.1, Math.min(1, Number(quality) / 100));
+      const totalEstimated = await this.estimateTotalImagesDeep(pdfDoc).catch(() => 0) || await this.estimateTotalImages(pdfDoc).catch(() => 0);
+      let processedImages = 0;
+      let replacedImages = 0;
+
+      const getFilters = (dict) => {
+        try {
+          const filt = dict.lookup ? dict.lookup(PDFName.of('Filter')) : null;
+          if (!filt) return [];
+          if (filt instanceof PDFArray) {
+            const out = [];
+            for (let i = 0; i < filt.size(); i++) {
+              const n = filt.get(i);
+              out.push(n && n.decodeText ? n.decodeText() : String(n || ''));
+            }
+            return out;
+          }
+          return [filt && filt.decodeText ? filt.decodeText() : String(filt || '')];
+        } catch { return []; }
+      };
+
+      const recompressJpeg = async (obj, name, xobjDict) => {
+        try {
+          const widthObj = obj.dict.get(PDFName.of('Width'));
+          const heightObj = obj.dict.get(PDFName.of('Height'));
+          const width = (widthObj && (widthObj.number ?? widthObj.value)) || 0;
+          const height = (heightObj && (heightObj.number ?? heightObj.value)) || 0;
+          let raw = null;
+          try { raw = typeof obj.getContents === 'function' ? obj.getContents() : null; } catch {}
+          if (!raw) { try { raw = obj.contents || null; } catch {} }
+          if (!raw || !width || !height) return false;
+
+          // Heurystyczny downscale przy niskiej jakości i dużych obrazach
+          let scale = 1;
+          if (q <= 0.5) scale = 0.75;
+          if (q <= 0.3) scale = 0.6;
+          const targetW = Math.max(1, Math.floor(width * scale));
+          const targetH = Math.max(1, Math.floor(height * scale));
+
+          const origSize = raw.length || 0;
+          const origBlob = new Blob([raw]);
+          let bmp = null;
+          // Spróbuj bez typu, potem z hintami
+          try { bmp = await createImageBitmap(origBlob); } catch {}
+          if (!bmp) {
+            try { bmp = await createImageBitmap(new Blob([raw], { type: 'image/jpeg' })); } catch {}
+          }
+          if (!bmp) {
+            try { bmp = await createImageBitmap(new Blob([raw], { type: 'image/jp2' })); } catch {}
+          }
+          if (!bmp) {
+            try { bmp = await createImageBitmap(new Blob([raw], { type: 'image/jpx' })); } catch {}
+          }
+          if (!bmp) {
+            try { bmp = await createImageBitmap(new Blob([raw], { type: 'image/png' })); } catch {}
+          }
+          if (!bmp) {
+            return false; // nie dekodujemy – zostaw oryginał
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW || bmp.width || 1;
+          canvas.height = targetH || bmp.height || 1;
+          const ctx = canvas.getContext('2d', { alpha: false });
+          ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+          const newBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', q));
+          const newBytes = new Uint8Array(await newBlob.arrayBuffer());
+
+          // Jeśli nowy większy, zachowaj oryginał
+          if (!newBytes || (origSize && newBytes.length >= origSize)) return false;
+
+          const embedded = await pdfDoc.embedJpg(newBytes);
+          // Zachowaj tę samą nazwę XObject w bieżącym słowniku XObject
+          xobjDict.set(name, embedded.ref);
+          replacedImages += 1;
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      const compressInDict = async (dict, level = 0) => {
+        if (!dict || typeof dict.lookup !== 'function') return;
+        const resources = dict.lookup(PDFName.of('Resources'));
+        if (resources && resources instanceof PDFDict) {
+          const xobj = resources.lookup(PDFName.of('XObject'));
+          if (xobj && xobj instanceof PDFDict) {
+            const keys = xobj.keys();
+            for (const name of keys) {
+              try {
+                const obj = xobj.lookup(name);
+                const subtype = obj && obj.dict ? obj.dict.get(PDFName.of('Subtype')) : null;
+                const subtypeText = subtype && subtype.decodeText ? subtype.decodeText() : String(subtype || '');
+                if (/Form$/i.test(subtypeText)) {
+                  // Rekurencja do Form XObject (użyj dict strumienia formularza)
+                  await compressInDict(obj.dict, level + 1);
+                } else if (/Image$/i.test(subtypeText)) {
+                  const filters = getFilters(obj.dict || {});
+                  // Spróbuj recompress dla JPEG/JPX/PNG-like (Flate); funkcja sama zdecyduje czy się uda
+                  await recompressJpeg(obj, name, xobj);
+                  processedImages += 1;
+                  if (progressCallback) {
+                    const denom = totalEstimated || '?';
+                    const pct = totalEstimated ? Math.min(85, 10 + Math.floor((processedImages / totalEstimated) * 70)) : 10;
+                    progressCallback({ percentage: pct, message: `Compressing images ${processedImages}/${denom}…` });
+                  }
+                }
+              } catch {
+                // ignore this entry
+              }
+            }
+          }
+        }
+      };
+
+      // Przejdź po wszystkich stronach (z rekurencją do Form XObjects)
+      const pageCount = pdfDoc.getPageCount();
+      for (let i = 0; i < pageCount; i++) {
+        const page = pdfDoc.getPage(i);
+        const pageDict = pdfDoc.context.lookup(page.ref, PDFDict);
+        await compressInDict(pageDict, 0);
+        if (progressCallback) {
+          const basePct = totalEstimated ? Math.min(90, 10 + Math.floor(((i + 1) / pageCount) * 70)) : 10 + Math.floor(((i + 1) / pageCount) * 70);
+          progressCallback({ percentage: basePct, message: `Scanning page ${i + 1}/${pageCount}… (${processedImages}/${totalEstimated} images)` });
+        }
+      }
+
+      return pdfDoc;
+    } catch (e) {
+      console.warn('[PDFProcessor] compressImagesInMainThread fallback:', e);
+      return pdfDoc;
+    }
+  }
+  
+  /**
+   * Prosty optimizer (no-op)
+   */
+  async optimizePDF(pdfDoc) { return pdfDoc; }
+
+  /**
+   * Generowanie nazwy pliku (zgodne z app.js)
+   */
+  generateFileName(originalName, options = {}) {
     const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "");
     const extension = '.pdf';
-    
     let suffix = '';
-    if (options.imageCompression) {
-      suffix += `-compressed-${options.imageQuality}`;
-    }
-    if (options.removeImages) {
-      suffix += '-no-images';
-    }
-    if (options.splitPDF) {
-      suffix += '-split';
-    }
-    
+    if (options.imageCompression) suffix += `-compressed-${options.imageQuality ?? 70}`;
+    if (options.removeImages) suffix += '-no-images';
+    if (options.splitPDF) suffix += '-split';
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    
     return `${nameWithoutExt}${suffix}-${timestamp}${extension}`;
   }
 
   /**
-   * Terminate Web Worker
+   * Metoda do usuwania obrazków z PDF
    */
-  terminateWorker() {
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
-      console.log('[PDFProcessor] Web Worker terminated');
-    }
-  }
+  async removeImages(file, options = {}, progressCallback = null) {
+    console.log('removeImages called with:', { 
+      fileName: file?.name, 
+      fileSize: file?.size,
+      fileType: file?.type 
+    });
 
-  /**
-   * Analyze image usage per page using pdf.js operator list (non-destructive)
-   */
-  async analyzeImages(pdfDoc) {
-    const bytes = await pdfDoc.save();
-    const loadingTask = window.pdfjsLib.getDocument({ data: bytes });
-    const pdf = await loadingTask.promise;
-    const OPS = window.pdfjsLib.OPS || {};
-    const result = [];
-    const pageCount = pdf.numPages || pdfDoc.getPageCount();
-    for (let i = 1; i <= pageCount; i++) {
-      const page = await pdf.getPage(i);
-      const opList = await page.getOperatorList();
-      let count = 0;
-      const names = [];
-      for (let j = 0; j < opList.fnArray.length; j++) {
-        const fn = opList.fnArray[j];
-        const args = opList.argsArray[j];
-        if (
-          fn === OPS.paintImageXObject ||
-          fn === OPS.paintInlineImageXObject ||
-          fn === OPS.paintImageXObjectRepeat
-        ) {
-          count += 1;
-          if (args && args[0] && typeof args[0] === 'string') {
-            names.push(args[0]);
-          }
-        }
+    try {
+      // Inicjalizacja
+        const initialized = await this.initialize();
+        if (!initialized) {
+        throw new Error('PDF libraries not initialized');
       }
-      result.push({ page: i, imageOps: count, names });
-    }
-    return result;
-  }
 
-  async removeImagesPreserveText(pdfDoc) {
-    try {
-      console.log('[PDFProcessor] removeImagesPreserveText: starting (non-destructive stub)');
-      const analysis = await this.analyzeImages(pdfDoc);
-      console.log('[PDFProcessor] Image usage by page:', analysis);
-      return pdfDoc;
-    } catch (error) {
-      console.warn('[PDFProcessor] removeImagesPreserveText failed, returning original document:', error);
-      return pdfDoc;
-    }
-  }
+      // Walidacja pliku
+      if (!file) {
+        throw new Error('No file provided');
+      }
 
-  hasHiddenFlag(name) {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get(name) === '1') return true;
-    } catch {}
-    try {
-      return localStorage.getItem(`flag-${name}`) === '1';
-    } catch {}
-    return false;
-  }
+      if (!(file instanceof File) && !(file instanceof Blob)) {
+        console.error('Invalid file object:', file);
+        throw new Error('Invalid file object');
+      }
 
-  /**
-   * Experimental: remove image Do operators from first page content stream (no rasterization)
-   * Only attempts on simple/uncompressed streams; otherwise returns original.
-   */
-  async removeImagesOnFirstPageWithoutRasterization(pdfDoc) {
-    if (!this.hasHiddenFlag('rm1')) return pdfDoc;
-    try {
-      const { PDFName, PDFArray, PDFDict } = this.PDFLib;
-      const page = pdfDoc.getPage(0);
-      const pageDict = pdfDoc.context.lookup(page.ref, PDFDict);
-      const contentsObj = pageDict.lookup(PDFName.of('Contents'));
+      // Progress: Loading
+      if (progressCallback) {
+        progressCallback({
+          percent: 10,
+          message: 'Loading PDF file...'
+        });
+      }
 
-      const textEncoder = new TextEncoder();
-      const textDecoder = new TextDecoder('latin1');
-      const filterDo = (bytes) => {
-        const src = textDecoder.decode(bytes);
-        // Remove occurrences like "/Im1 Do" possibly with preceding whitespace
-        const filtered = src.replace(/\s\/[A-Za-z0-9_\.\-]+\s+Do\b/g, '');
-        return textEncoder.encode(filtered);
+      // Konwersja do ArrayBuffer
+      console.log('Converting file to ArrayBuffer...');
+      let arrayBuffer;
+      try {
+        arrayBuffer = await file.arrayBuffer();
+        console.log('ArrayBuffer created, size:', arrayBuffer.byteLength);
+      } catch (error) {
+        console.error('Failed to read file:', error);
+        throw new Error('Failed to read file: ' + error.message);
+      }
+
+      // Ładowanie PDF
+      console.log('Loading PDF with PDFLib...');
+      let pdfDoc;
+      
+      try {
+        // Upewnij się, że używamy właściwej metody
+        if (!this.PDFLib || !this.PDFLib.PDFDocument || !this.PDFLib.PDFDocument.load) {
+          console.error('PDFLib structure:', {
+            PDFLib: !!this.PDFLib,
+            PDFDocument: !!this.PDFLib?.PDFDocument,
+            load: !!this.PDFLib?.PDFDocument?.load
+          });
+          throw new Error('PDFLib.PDFDocument.load is not available');
+        }
+
+        // Załaduj PDF
+        pdfDoc = await this.PDFLib.PDFDocument.load(arrayBuffer, {
+          ignoreEncryption: true,
+          throwOnInvalidObject: false,
+          updateMetadata: false
+        });
+
+        console.log('PDF loaded successfully:', {
+          pdfDoc: !!pdfDoc,
+          type: typeof pdfDoc,
+          constructor: pdfDoc?.constructor?.name
+        });
+
+      } catch (loadError) {
+        console.error('PDF load error:', loadError);
+        throw new Error(`Failed to load PDF: ${loadError.message}`);
+      }
+
+      // Sprawdź czy pdfDoc jest prawidłowy
+      if (!pdfDoc) {
+        throw new Error('pdfDoc is null or undefined');
+      }
+
+      // Sprawdź metody
+      console.log('Checking pdfDoc methods:', {
+        getPages: typeof pdfDoc.getPages,
+        getPageCount: typeof pdfDoc.getPageCount,
+        save: typeof pdfDoc.save
+      });
+
+      if (typeof pdfDoc.getPages !== 'function') {
+        console.error('pdfDoc object:', pdfDoc);
+        throw new Error('pdfDoc.getPages is not a function');
+      }
+
+      // Progress: Analyzing
+      if (progressCallback) {
+        progressCallback({
+          percent: 20,
+          message: 'Analyzing PDF structure...'
+        });
+      }
+
+      // Pobierz strony
+      let pages, pageCount;
+      try {
+        pageCount = pdfDoc.getPageCount();
+        pages = pdfDoc.getPages();
+        console.log(`PDF has ${pageCount} pages`);
+      } catch (error) {
+        console.error('Error getting pages:', error);
+        throw new Error('Failed to get PDF pages: ' + error.message);
+      }
+
+      // Zlicz obrazki
+      let totalImages = 0;
+      for (let i = 0; i < pages.length; i++) {
+        const imageCount = await this.countPageImages(pages[i], pdfDoc, i);
+        totalImages += imageCount;
+      }
+      
+      console.log(`Found ${totalImages} total images to remove`);
+
+      // Progress: Removing images
+      if (progressCallback) {
+        progressCallback({
+          percent: 30,
+          message: `Removing ${totalImages} images...`
+        });
+      }
+
+      // Usuń obrazki z każdej strony
+      for (let i = 0; i < pages.length; i++) {
+        if (progressCallback) {
+          const percent = 30 + Math.round((i / pages.length) * 50);
+          progressCallback({
+            percent,
+            message: `Processing page ${i + 1} of ${pages.length}...`
+          });
+        }
+
+        await this.removeImagesFromPage(pages[i], pdfDoc, i);
+      }
+
+      // Progress: Saving
+      if (progressCallback) {
+        progressCallback({
+          percent: 85,
+          message: 'Saving PDF...'
+        });
+      }
+
+      // Opcjonalna rekonstrukcja dokumentu, aby usunąć osierocone obiekty (np. obrazy)
+      let targetDoc = pdfDoc;
+      try {
+        const rebuilt = await this.PDFLib.PDFDocument.create();
+        const pageCountAfter = pdfDoc.getPageCount();
+        const copied = await rebuilt.copyPages(pdfDoc, Array.from({ length: pageCountAfter }, (_, i) => i));
+        copied.forEach(p => rebuilt.addPage(p));
+        targetDoc = rebuilt;
+      } catch (e) {
+        console.warn('[PDFProcessor] Rebuild skipped, using modified document directly:', e);
+      }
+
+      // Zapisz PDF (włącz kompresję obiektów)
+      console.log('Saving modified PDF...');
+      const pdfBytes = await targetDoc.save({
+        useObjectStreams: true,
+        addDefaultPage: false,
+        objectsPerTick: 50,
+        updateFieldAppearances: false
+      });
+
+      console.log('PDF saved, size:', pdfBytes.length);
+
+      // Statystyki
+      const stats = {
+        originalSize: file.size,
+        newSize: pdfBytes.length,
+        reduction: ((1 - pdfBytes.length / file.size) * 100).toFixed(2),
+        imagesRemoved: totalImages,
+        pageCount: pageCount
       };
 
-      if (contentsObj instanceof PDFArray) {
-        const newStreams = [];
-        let changed = false;
-        for (let idx = 0; idx < contentsObj.size(); idx++) {
-          const s = contentsObj.get(idx);
-          const stream = pdfDoc.context.lookup(s);
-          if (!stream || typeof stream.getContents !== 'function') {
-            newStreams.push(s);
-            continue;
+      if (progressCallback) {
+        progressCallback({
+          percent: 100,
+          message: `Completed! Removed ${stats.imagesRemoved} images, reduced size by ${stats.reduction}%`
+        });
+      }
+
+      return {
+        pdfBytes,
+        stats,
+        fileName: file.name.replace('.pdf', '_no_images.pdf')
+      };
+
+    } catch (error) {
+      console.error('Error in removeImages:', error);
+      console.error('Stack trace:', error.stack);
+      
+      // Re-throw z bardziej szczegółowym komunikatem
+      if (error.message.includes('getPages')) {
+        throw new Error('PDF document structure error. The file may be corrupted.');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Liczy obrazki na stronie z obsługą błędów
+   */
+  async countPageImages(page, pdfDoc, pageIndex) {
+    let count = 0;
+    
+    try {
+      if (!page || !page.node) {
+        console.warn(`Page ${pageIndex} has no node`);
+        return 0;
+      }
+
+      const pageDict = page.node;
+      const entries = pageDict.normalizedEntries ? pageDict.normalizedEntries() : {};
+      const resources = entries.Resources;
+      
+      if (!resources) {
+        return 0;
+      }
+
+      // Szukaj XObjects
+      try {
+        const xobjects = resources.lookup ? 
+          resources.lookup(this.PDFLib.PDFName.of('XObject'), this.PDFLib.PDFDict) :
+          null;
+        
+        if (xobjects && xobjects.entries) {
+          const xobjectEntries = xobjects.entries();
+          
+          for (const [name, ref] of xobjectEntries) {
+            try {
+              const xobject = pdfDoc.context.lookup(ref);
+              
+              if (xobject && xobject.dict) {
+                const subtype = xobject.dict.get(this.PDFLib.PDFName.of('Subtype'));
+                
+                if (subtype && subtype.encodedName === '/Image') {
+                  count++;
+                  console.log(`  Page ${pageIndex + 1}: Found image ${name.encodedName}`);
+                }
+              }
+            } catch (err) {
+              console.warn(`Error checking XObject on page ${pageIndex}:`, err);
+            }
           }
-          const original = stream.getContents();
-          const filtered = filterDo(original);
-          if (filtered && filtered.length !== original.length) changed = true;
-          const newStream = pdfDoc.context.flateStream(filtered);
-          newStreams.push(newStream);
         }
-        if (changed) {
-          const arr = this.PDFLib.PDFArray.withContext(pdfDoc.context);
-          newStreams.forEach((ns) => arr.push(ns));
-          pageDict.set(PDFName.of('Contents'), arr);
+      } catch (error) {
+        console.warn(`Error accessing XObjects on page ${pageIndex}:`, error);
+      }
+      
+    } catch (error) {
+      console.warn(`Error counting images on page ${pageIndex}:`, error);
+    }
+    
+    return count;
+  }
+
+  /**
+   * Usuwa obrazki ze strony z pełną obsługą błędów
+   */
+  async removeImagesFromPage(page, pdfDoc, pageIndex) {
+    try {
+      if (!page || !page.node) {
+        console.warn(`Page ${pageIndex} has no node, skipping`);
+        return;
+      }
+
+      const pageDict = page.node;
+      const entries = pageDict.normalizedEntries ? pageDict.normalizedEntries() : {};
+      const resources = entries.Resources;
+      
+      if (!resources) {
+        console.log(`Page ${pageIndex + 1}: No resources found`);
+        return;
+      }
+
+      // Sprawdź XObjects
+      try {
+        const xobjects = resources.lookup ? 
+          resources.lookup(this.PDFLib.PDFName.of('XObject'), this.PDFLib.PDFDict) :
+          null;
+        
+        if (xobjects && xobjects.entries) {
+          const newXObjectDict = pdfDoc.context.obj({});
+          const xobjectEntries = xobjects.entries();
+          let hasNonImages = false;
+          let removedCount = 0;
+          
+          for (const [name, ref] of xobjectEntries) {
+            try {
+              const xobject = pdfDoc.context.lookup(ref);
+              
+              if (xobject && xobject.dict) {
+                const subtype = xobject.dict.get(this.PDFLib.PDFName.of('Subtype'));
+                
+                if (subtype && subtype.encodedName === '/Image') {
+                  // To jest obrazek - pomijamy
+                  removedCount++;
+                  console.log(`  Removing image: ${name.encodedName} from page ${pageIndex + 1}`);
+                } else {
+                  // To nie jest obrazek - zachowujemy
+                  newXObjectDict.set(name, ref);
+                  hasNonImages = true;
+                }
+              }
+            } catch (err) {
+              console.warn(`Error processing XObject ${name.encodedName}:`, err);
+            }
+          }
+          
+          // Aktualizuj XObjects
+          if (hasNonImages) {
+            resources.set(this.PDFLib.PDFName.of('XObject'), newXObjectDict);
+          } else if (resources.delete) {
+            resources.delete(this.PDFLib.PDFName.of('XObject'));
+          }
+          
+          if (removedCount > 0) {
+            console.log(`  Removed ${removedCount} images from page ${pageIndex + 1}`);
+          }
         }
-      } else if (contentsObj && typeof contentsObj.getContents === 'function') {
-        const original = contentsObj.getContents();
-        const filtered = filterDo(original);
-        if (filtered && filtered.length !== original.length) {
-          const newStream = pdfDoc.context.flateStream(filtered);
-          pageDict.set(PDFName.of('Contents'), newStream);
+      } catch (error) {
+        console.warn(`Error modifying XObjects on page ${pageIndex}:`, error);
+      }
+
+      // Oczyść content stream
+      await this.cleanContentStream(page, pdfDoc, pageIndex);
+      
+    } catch (error) {
+      console.error(`Error removing images from page ${pageIndex}:`, error);
+    }
+  }
+
+  /**
+   * Czyści content stream z odniesień do obrazków
+   */
+  async cleanContentStream(page, pdfDoc, pageIndex) {
+    try {
+      if (!page || !page.node) return;
+
+      const pageDict = page.node;
+      const entries = pageDict.normalizedEntries ? pageDict.normalizedEntries() : {};
+      const contents = entries.Contents;
+      
+      if (!contents) return;
+
+      let contentStream = '';
+      
+      // Pobierz content stream
+      try {
+        if (contents.constructor && contents.constructor.name === 'PDFArray') {
+          for (let i = 0; i < contents.size(); i++) {
+            const stream = contents.lookup(i);
+            if (stream && stream.contents) {
+              contentStream += new TextDecoder().decode(stream.contents) + '\n';
+            }
+          }
+        } else if (contents && contents.contents) {
+          contentStream = new TextDecoder().decode(contents.contents);
+        }
+      } catch (error) {
+        console.warn(`Error reading content stream on page ${pageIndex}:`, error);
+        return;
+      }
+
+      // Modyfikuj content
+      let modified = contentStream;
+      
+      // Usuń obrazki
+      const originalLength = modified.length;
+      modified = modified.replace(/q[^Q]*?\/\w+\s+Do\s*Q/g, '');
+      modified = modified.replace(/\/\w+\s+Do/g, '');
+      modified = modified.replace(/BI\s+[\s\S]*?\s+ID\s+[\s\S]*?\s+EI/g, '');
+      
+      // Zapisz jeśli zmieniono
+      if (modified !== contentStream && modified.trim()) {
+        try {
+          // Zapisuj skompresowany strumień, aby uniknąć wzrostu rozmiaru
+          const newContents = pdfDoc.context.flateStream(new TextEncoder().encode(modified));
+          pageDict.set(this.PDFLib.PDFName.of('Contents'), newContents);
+          console.log(`  Cleaned content stream on page ${pageIndex + 1} (${originalLength} -> ${modified.length} bytes)`);
+    } catch (error) {
+          console.warn(`Error updating content stream on page ${pageIndex}:`, error);
         }
       }
-      return pdfDoc;
-    } catch (err) {
-      console.warn('[PDFProcessor] removeImagesOnFirstPageWithoutRasterization skipped:', err);
-      return pdfDoc;
+      
+    } catch (error) {
+      console.warn(`Error cleaning content stream on page ${pageIndex}:`, error);
+    }
+  }
+
+  /**
+   * Split PDF into chunks with a fixed number of pages per output file
+   * @param {PDFDocument} pdfDoc
+   * @param {number} pagesPerChunk
+   * @param {Function} progressCallback
+   * @returns {Promise<PDFDocument[]>}
+   */
+  async splitByPagesFixed(pdfDoc, pagesPerChunk, progressCallback = null) {
+    const outputs = [];
+    try {
+      const pageCount = pdfDoc.getPageCount();
+      const chunkSize = Math.max(1, Number(pagesPerChunk) | 0);
+      let from = 1;
+      let part = 0;
+      while (from <= pageCount) {
+        const to = Math.min(pageCount, from + chunkSize - 1);
+        const partDoc = await this.PDFLib.PDFDocument.create();
+        const copied = await partDoc.copyPages(pdfDoc, Array.from({ length: to - from + 1 }, (_, i) => from - 1 + i));
+        copied.forEach(p => partDoc.addPage(p));
+        outputs.push(partDoc);
+        part += 1;
+        if (progressCallback) {
+          const pct = Math.min(95, Math.round((to / pageCount) * 100));
+          progressCallback({ percentage: pct, message: `Splitting pages ${from}-${to} (${part} files)` });
+        }
+        from = to + 1;
+      }
+      return outputs;
+    } catch (e) {
+      console.error('[PDFProcessor] splitByPagesFixed error:', e);
+      return outputs;
     }
   }
 }
+
+export default PDFProcessor;

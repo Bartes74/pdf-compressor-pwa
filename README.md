@@ -1,15 +1,20 @@
 # PDF Compressor PWA
 
-A Progressive Web App for compressing PDF files locally in your browser without uploading them to any server.
+Local PDF compression, image removal, and splitting — all in the browser.
+
+## Documentation
+- Architecture: see `docs/ARCHITECTURE.md`
+- Developer Guide: see `docs/DEVELOPER_GUIDE.md`
+- API Reference: see `docs/API_REFERENCE.md`
+- Split Feature Plan: see `docs/SPLIT_PLAN.md`
 
 ## Features
 
-- Compress PDF files directly in your browser
-- No server uploads required - all processing happens locally
-- Progressive Web App support - installable on mobile and desktop
-- Offline functionality after initial visit
-- Responsive design that works on all devices
-- Three compression levels: Low, Medium, and High
+- Image Compression (quality slider, preserves text)
+- Image Removal (non‑rasterizing, preserves text content)
+- Split PDF (by pages or by size with robust limits)
+- 100% local processing — no uploads
+- PWA install/offline ready
 
 ## Project Structure
 
@@ -24,7 +29,7 @@ A Progressive Web App for compressing PDF files locally in your browser without 
       - pdf-worker.js (Web Worker for PDF processing)
     /css
       - styles.css (main styles)
-      - responsive.css (responsive design styles)
+      - responsive.css (responsive design styles) [removed]
     /assets
       /icons (PWA icons in various sizes)
     /tests
@@ -72,7 +77,7 @@ A Progressive Web App for compressing PDF files locally in your browser without 
 
 To start the development server:
 ```bash
-npm start
+npm run dev
 ```
 
 To build for production:

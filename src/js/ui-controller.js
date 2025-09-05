@@ -57,6 +57,8 @@ export class UIController {
     
     // Apply initial theme
     this.applyTheme();
+    // Force hide install banner if present
+    try { const el = document.getElementById('installBanner'); if (el) el.style.display = 'none'; } catch {}
     
     // Handle initial responsive state
     this.handleResize();
@@ -476,11 +478,30 @@ export class UIController {
     if (this.elements.fileSizeLimit) {
       this.elements.fileSizeLimit.addEventListener('input', (e) => {
         if (this.app) {
-          const val = Math.max(1, Math.min(500, Number(e.target.value)));
+          const parsed = this.parseSizeToMB(String(e.target.value || ''));
+          const val = Math.max(1, Math.min(500, parsed));
           this.app.updateProcessingOptions({ fileSizeLimit: val });
         }
       });
     }
+  }
+
+  /**
+   * Parse user-entered size like "10", "10MB", "10240kb", "10485760" to MB number
+   */
+  parseSizeToMB(input) {
+    const str = String(input).trim().toLowerCase();
+    if (!str) return 10;
+    const match = str.match(/([0-9]*\.?[0-9]+)/);
+    const num = match ? parseFloat(match[1]) : NaN;
+    if (!isFinite(num)) return 10;
+    if (str.includes('gb')) return Math.max(1, Math.round(num * 1024));
+    if (str.includes('g')) return Math.max(1, Math.round(num * 1024));
+    if (str.includes('mb') || str.endsWith('m')) return Math.max(1, Math.round(num));
+    if (str.includes('kb') || str.endsWith('k')) return Math.max(1, Math.round(num / 1024));
+    if (str.includes('b')) return Math.max(1, Math.round(num / (1024 * 1024)));
+    // Default: treat as MB if unitless
+    return Math.max(1, Math.round(num));
   }
 
   /**
@@ -749,6 +770,59 @@ export class UIController {
     
     // Trigger animation
     this.triggerAnimation('notification-show');
+  }
+
+  /**
+   * Show centered blocking error modal with OK button
+   * @param {string} message
+   */
+  showErrorModal(message) {
+    try {
+      // Remove existing modal/backdrop if present to avoid duplicates
+      const existing = document.getElementById('modal-backdrop');
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+      const backdrop = document.createElement('div');
+      backdrop.id = 'modal-backdrop';
+      backdrop.className = 'modal-backdrop';
+
+      const modal = document.createElement('div');
+      modal.className = 'error-modal';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+
+      modal.innerHTML = `
+        <h3>Błąd</h3>
+        <div class="message">${message || 'Wystąpił błąd.'}</div>
+        <div class="modal-actions">
+          <button id="modalOkBtn" class="btn-primary">OK</button>
+        </div>
+      `;
+
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+
+      const ok = modal.querySelector('#modalOkBtn');
+      if (ok) {
+        ok.addEventListener('click', () => this.closeModal());
+        setTimeout(() => ok.focus(), 0);
+      }
+
+      const onKey = (e) => {
+        if (e.key === 'Escape') {
+          this.closeModal();
+        }
+      };
+      document.addEventListener('keydown', onKey, { once: true });
+    } catch (e) {
+      // Fallback
+      this.showNotification(message || 'Wystąpił błąd.', 'error');
+    }
+  }
+
+  closeModal() {
+    const backdrop = document.getElementById('modal-backdrop');
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
   }
 
   /**

@@ -1,3 +1,232 @@
+/* Statystyki w rezultatach */
+.result-stats {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.stat-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background: var(--primary);
+  color: white;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.result-reduction {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Modal ze statystykami */
+.stats-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: var(--shadow-xl);
+  z-index: 1000;
+  max-width: 500px;
+  width: 90%;
+}
+
+.stats-modal h3 {
+  color: var(--primary);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.stat-item {
+  padding: 1rem;
+  background: var(--background);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  display: block;
+  color: var(--primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* Powiadomienia o błędach */
+.error-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: var(--error);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 9999;
+  transform: translateX(400px);
+  transition: transform 0.3s ease;
+}
+
+.error-notification.show {
+  transform: translateX(0);
+}
+/* Centered error modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+.error-modal {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 2px solid var(--error);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  width: min(520px, 92vw);
+  box-shadow: var(--shadow-xl);
+}
+
+.error-modal h3 {
+  margin: 0 0 0.5rem;
+  color: var(--error);
+}
+
+.error-modal .message {
+  margin: 0.5rem 0 1rem;
+  line-height: 1.4;
+}
+
+.error-modal .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.error-modal .btn-primary {
+  background: linear-gradient(135deg, var(--error) 0%, #ff7a7a 100%);
+  color: #fff;
+}
+
+.error-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.error-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+/* Animacja ładowania dla przycisku */
+.btn-primary.loading {
+  position: relative;
+  color: transparent;
+}
+
+.btn-primary.loading::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 50%;
+  left: 50%;
+  margin-left: -10px;
+  margin-top: -10px;
+  border: 2px solid white;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spinner 0.6s linear infinite;
+}
+
+@keyframes spinner {
+  to { transform: rotate(360deg); }
+}
+
+/* Ulepszone style dla opcji usuwania obrazków */
+.option-card.remove-images {
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.option-card.remove-images.active {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, 
+    rgba(2, 125, 143, 0.05) 0%, 
+    rgba(3, 169, 193, 0.05) 100%);
+}
+
+.option-card.remove-images .option-icon {
+  background: linear-gradient(135deg, var(--error) 0%, #FF6B6B 100%);
+}
+
+/* Tooltip dla informacji */
+.tooltip {
+  position: relative;
+  display: inline-block;
+  margin-left: 0.5rem;
+}
+
+.tooltip .tooltip-text {
+  visibility: hidden;
+  width: 250px;
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
+  text-align: left;
+  border-radius: 8px;
+  padding: 0.75rem;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -125px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tooltip-icon {
+  width: 16px;
+  height: 16px;
+  background: var(--text-secondary);
+  color: var(--surface);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  cursor: help;
+}
 /* Main Styles for PDF Compressor PWA */
 :root {
   /* Light mode - nowoczesna paleta z wiodącym #027D8F */
@@ -548,6 +777,54 @@ button {
   text-align: center;
 }
 
+/* Split results list */
+.split-results-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.split-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+}
+
+.split-result-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.split-result-size {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-left: 8px;
+}
+
+.split-result-actions a.button-download {
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+  font-size: 0.85rem;
+}
+
+.split-result-actions a.button-download:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
 .result-item {
   display: flex;
   justify-content: space-between;
@@ -613,7 +890,7 @@ button {
 }
 
 /* Notifications */
-.install-banner, .offline-notification {
+.offline-notification {
   background: var(--primary);
   color: white;
   padding: 0.75rem 1.5rem;
@@ -630,6 +907,9 @@ button {
   box-shadow: var(--shadow-md);
   font-size: 0.9rem;
 }
+
+/* Permanently hide install banner */
+.install-banner { display: none !important; }
 
 .install-banner button, .offline-notification button {
   padding: 0.4rem 0.8rem;

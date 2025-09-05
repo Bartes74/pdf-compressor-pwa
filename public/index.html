@@ -28,43 +28,155 @@
     
     <!-- Lazy loading bibliotek PDF -->
     <script>
-      // Funkcja do dynamicznego ładowania skryptów
-      function loadScript(src) {
-        return new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = src;
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      // Lazy load bibliotek tylko gdy potrzebne
+      // Funkcja do ładowania bibliotek PDF
       window.loadPDFLibraries = async function() {
-        if (window.PDFLib && window.pdfjsLib) return;
+        console.log('Loading PDF libraries...');
+        
+        // Sprawdź czy już załadowane
+        if (window.PDFLib && window.pdfjsLib) {
+          console.log('Libraries already loaded');
+          return true;
+        }
+        
+        // Funkcja pomocnicza do ładowania skryptu
+        function loadScript(src, globalName) {
+          return new Promise((resolve, reject) => {
+            // Sprawdź czy już istnieje
+            if (globalName && window[globalName]) {
+              console.log(`${globalName} already exists`);
+              resolve();
+              return;
+            }
+            
+            // Sprawdź czy skrypt już jest ładowany
+            const existingScript = document.querySelector(`script[src="${src}"]`);
+            if (existingScript) {
+              console.log(`Script ${src} already loading`);
+              existingScript.addEventListener('load', resolve);
+              existingScript.addEventListener('error', reject);
+              return;
+            }
+            
+            // Utwórz nowy skrypt
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            
+            script.onload = () => {
+              console.log(`Loaded: ${src}`);
+              if (globalName && !window[globalName]) {
+                reject(new Error(`${globalName} not found after loading ${src}`));
+              } else {
+                resolve();
+              }
+            };
+            
+            script.onerror = () => {
+              console.error(`Failed to load: ${src}`);
+              reject(new Error(`Failed to load ${src}`));
+            };
+            
+            document.head.appendChild(script);
+          });
+        }
         
         try {
-          // Pokaż loading indicator
-          if (window.showLoadingLibraries) window.showLoadingLibraries();
-          
-          // Ładuj równolegle
-          await Promise.all([
-            !window.PDFLib && loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'),
-            !window.pdfjsLib && loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
-          ]);
-          
-          // Ustaw worker dla pdf.js
-          if (window.pdfjsLib) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          // Pokaż loader
+          if (window.showLoadingLibraries) {
+            window.showLoadingLibraries();
           }
           
-          // Ukryj loading indicator
-          if (window.hideLoadingLibraries) window.hideLoadingLibraries();
+          // Załaduj pdf-lib
+          if (!window.PDFLib) {
+            console.log('Loading pdf-lib...');
+            await loadScript(
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
+              'PDFLib'
+            );
+            
+            // Sprawdź czy załadowano poprawnie
+            if (!window.PDFLib) {
+              throw new Error('PDFLib not available after loading');
+            }
+            
+            console.log('pdf-lib loaded successfully:', {
+              PDFDocument: !!window.PDFLib.PDFDocument,
+              load: typeof window.PDFLib.PDFDocument?.load
+            });
+          }
+          
+          // Załaduj pdf.js (opcjonalnie)
+          if (!window.pdfjsLib) {
+            console.log('Loading pdf.js...');
+            await loadScript(
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+              'pdfjsLib'
+            );
+            
+            if (window.pdfjsLib) {
+              pdfjsLib.GlobalWorkerOptions.workerSrc = 
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+              console.log('pdf.js loaded successfully');
+            }
+          }
+          
+          // Ukryj loader
+          if (window.hideLoadingLibraries) {
+            window.hideLoadingLibraries();
+          }
+          
+          console.log('All PDF libraries loaded successfully');
+          return true;
+          
+        } catch (error) {
+          console.error('Failed to load PDF libraries:', error);
+          
+          // Ukryj loader
+          if (window.hideLoadingLibraries) {
+            window.hideLoadingLibraries();
+          }
+          
+          // Spróbuj załadować lokalnie jako fallback
+          console.log('Trying local fallback...');
+          
+          // Tu możesz dodać fallback do lokalnych plików
+          return false;
+        }
+      };
+      
+      // Loader UI functions
+      window.showLoadingLibraries = function() {
+        const loader = document.getElementById('library-loader');
+        if (loader) loader.style.display = 'block';
+      };
+      
+      window.hideLoadingLibraries = function() {
+        const loader = document.getElementById('library-loader');
+        if (loader) loader.style.display = 'none';
+      };
+      
+      // Test czy biblioteki działają
+      window.testPDFLib = async function() {
+        if (!window.PDFLib) {
+          console.error('PDFLib not loaded');
+          return false;
+        }
+        
+        try {
+          // Stwórz pusty PDF jako test
+          const pdfDoc = await window.PDFLib.PDFDocument.create();
+          const page = pdfDoc.addPage();
+          const pdfBytes = await pdfDoc.save();
+          
+          console.log('PDFLib test successful:', {
+            pdfCreated: !!pdfDoc,
+            pageAdded: !!page,
+            byteLength: pdfBytes.length
+          });
           
           return true;
         } catch (error) {
-          console.error('Failed to load PDF libraries:', error);
-          // Fallback do lokalnych bibliotek
+          console.error('PDFLib test failed:', error);
           return false;
         }
       };
@@ -128,6 +240,8 @@
         </div>
     </header>
     
+    
+
     <main>
         <div class="upload-container">
             <!-- Drag and Drop Area -->

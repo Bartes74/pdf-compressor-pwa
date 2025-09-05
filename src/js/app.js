@@ -122,8 +122,32 @@ class PDFCompressorApp {
     // Initialize processing engine (feature-flagged)
     this.engine = createEngine(this);
     
+    // Wire optional remove-images option in UI if present
+    this.setupRemoveImagesOption();
+    
     // Setup event listeners
     this.setupEventListeners();
+  }
+
+  /**
+   * Wire UI option to toggle removing images
+   */
+  setupRemoveImagesOption() {
+    try {
+      const removeToggle = document.getElementById('removeToggle');
+      const removeOption = document.getElementById('removeOption');
+      if (removeToggle && removeOption) {
+        removeOption.addEventListener('click', () => {
+          const next = !this.state.processingOptions.removeImages;
+          this.updateProcessingOptions({ removeImages: next, imageCompression: next ? false : this.state.processingOptions.imageCompression });
+          removeToggle.classList.toggle('active');
+          const compressToggle = document.getElementById('compressToggle');
+          if (next && compressToggle) compressToggle.classList.remove('active');
+        });
+      }
+    } catch (e) {
+      // Ignore if elements are not present
+    }
   }
 
   /**
@@ -169,6 +193,9 @@ class PDFCompressorApp {
         pageCount: 'Calculating...',
         imageCount: 'Analyzing...'
       });
+      // Enable Process button now that we have a valid file
+      const processBtn = document.getElementById('processBtn');
+      if (processBtn) processBtn.disabled = false;
       
       // Ensure PDF libraries are loaded (with graceful error)
       try {
@@ -178,10 +205,17 @@ class PDFCompressorApp {
         return;
       }
       
-      // Load PDF document and update detailed metadata
+      // Load PDF document and update detailed metadata + estimate images
       const result = await this.pdfProcessor.loadPDF(file);
       this.state.pdfDocument = result.pdfDoc;
-      this.uiController.showFileInfo(result.metadata);
+      // Estimate images asynchronously and update UI when ready
+      let imageCount = '0';
+      try {
+        imageCount = String(await this.pdfProcessor.estimateTotalImages(result.pdfDoc));
+      } catch {}
+      this.uiController.showFileInfo({ ...result.metadata, imageCount });
+      // Keep Process button enabled after metadata is loaded
+      if (processBtn) processBtn.disabled = false;
       
       console.log(`[PDFCompressor] File loaded: ${file.name}`);
     } catch (error) {
@@ -241,9 +275,16 @@ class PDFCompressorApp {
    */
   async processPDF() {
     try {
+      console.log('[PDFCompressor] processPDF() called with options:', this.state.processingOptions, 'file:', this.state.currentFile?.name);
       // Ensure there is a file selected
       if (!this.state.currentFile) {
         this.showErrorMessage('No PDF file selected');
+        return;
+      }
+      // Ensure at least one processing option
+      const opts = this.state.processingOptions;
+      if (!opts.removeImages && !opts.imageCompression && !opts.splitPDF) {
+        this.showError('Please select at least one processing option');
         return;
       }
       
@@ -269,11 +310,41 @@ class PDFCompressorApp {
       
       // Hook progress callback
       const progressCallback = (p) => {
-        const percent = typeof p === 'number' ? p : (p && p.percentage) || 0;
+        const percent = typeof p === 'number' ? p : (p && (p.percentage ?? p.percent)) || 0;
         const message = (p && p.message) || `Processing... ${percent}%`;
         this.uiController.updateProgress(percent, message);
       };
       
+      // If removal is selected, use dedicated removal flow (keeps text, removes images)
+      if (this.state.processingOptions.removeImages) {
+        this.uiController.updateProgress(10, 'Preparing to remove images...');
+        const removal = await this.pdfProcessor.removeImages(
+          this.state.currentFile,
+          {},
+          progressCallback
+        );
+        const processedFile = new File([removal.pdfBytes], removal.fileName, { type: 'application/pdf' });
+        const files = {
+          originalFile: this.state.currentFile,
+          processedFile,
+          savings: this.pdfProcessor.estimateCompression(this.state.currentFile.size, removal.pdfBytes.length)
+        };
+        // Prefer custom results list UI if present; otherwise use existing UIController view
+        const resultsList = document.getElementById('resultsList');
+        if (resultsList) {
+          this.showResults([
+            { name: removal.fileName, data: removal.pdfBytes, size: removal.pdfBytes.length, stats: removal.stats }
+          ]);
+        } else {
+          const storageManager = await this.getStorageManager();
+          await storageManager.saveResult(files);
+          this.uiController.showResults(files);
+        }
+        this.endPerformanceTracking();
+        this.state.isProcessing = false;
+        return;
+      }
+
       // Process PDF via engine
       const result = await this.engine.process(
         this.state.currentFile,
@@ -282,7 +353,7 @@ class PDFCompressorApp {
       );
       
       // Validate result
-      if (!result || !result.processedFile) {
+      if (!result || (!result.processedFile && !result.files)) {
         throw new Error('PDF processing returned invalid result');
       }
       
@@ -297,18 +368,160 @@ class PDFCompressorApp {
       // Get storage manager (load dynamically if needed)
       const storageManager = await this.getStorageManager();
       
-      // Save result to storage
-      await storageManager.saveResult(result);
-      
-      // Show results in UI
-      this.uiController.showResults(result);
+      // If multiple files (split), show list; otherwise single result
+      if (result.files && Array.isArray(result.files) && result.files.length > 0) {
+        const list = result.files.map(f => ({ name: f.name, data: f, size: f.size }));
+        // Render simple list under results section
+        const container = document.getElementById('resultsSection');
+        if (container) {
+          container.style.display = 'block';
+          // clear existing
+          container.innerHTML = '<h3>Split Complete</h3>';
+          const wrap = document.createElement('div');
+          wrap.className = 'split-results-list';
+          list.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'split-result-item';
+            const left = document.createElement('div');
+            const nameEl = document.createElement('span');
+            nameEl.className = 'split-result-name';
+            nameEl.textContent = item.name;
+            const sizeEl = document.createElement('span');
+            sizeEl.className = 'split-result-size';
+            sizeEl.textContent = `(${this.formatFileSize(item.size)})`;
+            left.appendChild(nameEl);
+            left.appendChild(sizeEl);
+            const actions = document.createElement('div');
+            actions.className = 'split-result-actions';
+            const a = document.createElement('a');
+            a.className = 'button-download';
+            const url = URL.createObjectURL(item.data);
+            a.href = url;
+            a.download = item.name;
+            a.textContent = 'Download';
+            actions.appendChild(a);
+            row.appendChild(left);
+            row.appendChild(actions);
+            wrap.appendChild(row);
+          });
+          container.appendChild(wrap);
+        }
+      } else {
+        // Save single result to storage
+        await storageManager.saveResult(result);
+        // Show results in UI
+        this.uiController.showResults(result);
+      }
       
       this.state.isProcessing = false;
     } catch (error) {
       this.state.isProcessing = false;
       console.error('[PDFCompressor] Error processing PDF:', error);
-      this.showErrorMessage('Error processing PDF: ' + error.message);
+      // Hide progress if visible
+      try { this.uiController.hideProgress(); } catch {}
+      // Show localized message
+      // Pokaż modal błędu (centrowany, z OK)
+      try { this.uiController.showErrorModal(error?.message || 'Wystąpił błąd'); }
+      catch { this.showErrorMessage('Błąd przetwarzania PDF: ' + (error?.message || error)); }
     }
+  }
+
+  // Lightweight helpers used by alternative upload UI if present
+  async handleFileSelect(event) {
+    const file = event?.target?.files?.[0];
+    if (file && (file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf'))) {
+      await this.handleFile(file);
+    } else if (file) {
+      this.showError('Please select a valid PDF file');
+    }
+  }
+
+  async handleDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const uploadArea = document.getElementById('uploadArea');
+    if (uploadArea) uploadArea.classList.remove('dragover');
+    const file = event.dataTransfer?.files?.[0];
+    if (file && (file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf'))) {
+      await this.handleFile(file);
+    } else if (file) {
+      this.showError('Please drop a valid PDF file');
+    }
+  }
+
+  async handleFile(file) {
+    try {
+      if (file.size > 500 * 1024 * 1024) {
+        this.showError('File size exceeds 500 MB limit');
+        return;
+      }
+      this.state.currentFile = file;
+      this.updateFileInfo(file);
+      const processBtn = document.getElementById('processBtn');
+      if (processBtn) processBtn.disabled = false;
+      console.log('File loaded:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
+    } catch (error) {
+      console.error('Error handling file:', error);
+      this.showError('Error loading file: ' + error.message);
+    }
+  }
+
+  updateFileInfo(file) {
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    if (fileInfo) fileInfo.classList.add('active');
+    if (fileName) fileName.textContent = file.name;
+    if (fileSize) fileSize.textContent = this.formatFileSize(file.size);
+    const pageCount = document.getElementById('pageCount');
+    const imageCount = document.getElementById('imageCount');
+    if (pageCount) pageCount.textContent = 'Analyzing...';
+    if (imageCount) imageCount.textContent = 'Analyzing...';
+  }
+
+  showError(message) {
+    console.error('Error:', message);
+    const notification = document.createElement('div');
+    notification.className = 'error-notification';
+    notification.innerHTML = `
+      <div class="error-content">
+        <span>⚠️ ${message}</span>
+      </div>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.classList.add('show'), 10);
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 5000);
+  }
+
+  handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const uploadArea = document.getElementById('uploadArea');
+    if (uploadArea) uploadArea.classList.add('dragover');
+  }
+
+  handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const uploadArea = document.getElementById('uploadArea');
+    if (uploadArea) uploadArea.classList.remove('dragover');
+  }
+
+  resetApp() {
+    this.state.currentFile = null;
+    this.state.processingOptions = { ...this.state.processingOptions, removeImages: false, imageCompression: false, splitPDF: false };
+    const fileInfo = document.getElementById('fileInfo');
+    if (fileInfo) fileInfo.classList.remove('active');
+    const resultsSection = document.getElementById('resultsSection');
+    if (resultsSection) resultsSection.classList.remove('active');
+    const processBtn = document.getElementById('processBtn');
+    if (processBtn) processBtn.disabled = true;
+    document.querySelectorAll('.option-toggle')?.forEach((t) => t.classList.remove('active'));
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) fileInput.value = '';
   }
 
   /**
@@ -435,6 +648,30 @@ class PDFCompressorApp {
       console.log('[PDFCompressor] DOM Content Loaded');
     });
     
+    // File input and upload area bindings
+    const fileInput = document.getElementById('fileInput');
+    const uploadArea = document.getElementById('uploadArea');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+    }
+    if (uploadArea) {
+      uploadArea.addEventListener('click', () => fileInput?.click());
+      uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
+      uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+      uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
+    }
+    
+    const processBtn = document.getElementById('processBtn');
+    if (processBtn) {
+      processBtn.addEventListener('click', () => this.processPDF());
+    }
+    const resetBtn = document.getElementById('resetBtn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => this.resetApp());
+    }
+    
+    this.setupOptionToggles();
+
     // Online/Offline events
     window.addEventListener('online', () => {
       console.log('[PDFCompressor] Online');
@@ -470,23 +707,31 @@ class PDFCompressorApp {
     });
   }
 
+  setupOptionToggles() {
+    const removeToggle = document.getElementById('removeToggle');
+    const removeOption = document.getElementById('removeOption');
+    if (removeToggle && removeOption) {
+      const toggleHandler = () => {
+        const next = !this.state.processingOptions.removeImages;
+        this.updateProcessingOptions({ removeImages: next, imageCompression: next ? false : this.state.processingOptions.imageCompression });
+        removeToggle.classList.toggle('active');
+        console.log('Remove images option:', next);
+      };
+      removeOption.addEventListener('click', toggleHandler);
+      removeToggle.addEventListener('click', (e) => { e.stopPropagation(); toggleHandler(); });
+    }
+  }
+
   /**
 /**
    * Setup PWA features
    */
   setupPWAFeatures() {
-    // Install prompt handling
+    // Disable install prompt banner
     window.addEventListener('beforeinstallprompt', (e) => {
-      console.log('[PDFCompressor] Install prompt available');
       e.preventDefault();
-      this.deferredPrompt = e;
-      this.uiController.showInstallPrompt();
-    });
-    
-    // Handle app installed event
-    window.addEventListener('appinstalled', () => {
-      console.log('[PDFCompressor] App installed');
-      this.uiController.hideInstallPrompt();
+      this.deferredPrompt = null;
+      try { this.uiController.hideInstallPrompt(); } catch {}
     });
   }
 
