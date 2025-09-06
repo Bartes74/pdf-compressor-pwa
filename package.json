@@ -107,13 +107,16 @@
         "portable",
         "zip"
       ],
-      "icon": "build/icon.ico",
-      "artifactName": "${productName}-${version}-${os}-${arch}-${target}.${ext}"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false
+      "allowToChangeInstallationDirectory": false,
+      "artifactName": "${productName}-${version}-${arch}-nsis.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
     }
   },
   "lint-staged": {
