@@ -32,7 +32,7 @@ jobs:
         run: npm run build
 
       - name: Build macOS DMG (unsigned)
-        run: npx electron-builder -m
+        run: npx electron-builder -m --publish=never
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

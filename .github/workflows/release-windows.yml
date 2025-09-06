@@ -32,7 +32,7 @@ jobs:
         run: npm run build
 
       - name: Build Windows NSIS + Portable + ZIP
-        run: npx electron-builder --win nsis portable zip --x64
+        run: npx electron-builder --win nsis portable zip --x64 --publish=never
 
       - name: Upload installer artifact (NSIS)
         uses: actions/upload-artifact@v4
