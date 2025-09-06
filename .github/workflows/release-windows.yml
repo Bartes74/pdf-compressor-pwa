@@ -29,12 +29,24 @@ jobs:
       - name: Build web assets
         run: npm run build
 
-      - name: Build Windows NSIS
-        run: npx electron-builder --win nsis --x64
+      - name: Build Windows NSIS + Portable + ZIP
+        run: npx electron-builder --win nsis portable zip --x64
 
-      - name: Upload artifact
+      - name: Upload installer artifact (NSIS)
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: dist/*.exe
+
+      - name: Upload portable artifact (exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-exe
+          path: dist/*-portable.exe
+
+      - name: Upload portable artifact (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-zip
+          path: dist/*.zip
 
