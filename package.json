@@ -95,12 +95,16 @@
       "buildResources": "build"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.utilities",
       "icon": "build/icon.icns"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
@@ -108,7 +112,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": false
     }
-  }
+  },
   "lint-staged": {
     "*.{js,css,json,md}": [
       "prettier --write"
@@ -123,7 +127,7 @@
       "limit": "50 KB"
     },
     {
-      "path": "dist/vendors.*.js", 
+      "path": "dist/vendors.*.js",
       "limit": "100 KB"
     }
   ],

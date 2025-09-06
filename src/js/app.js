@@ -16,7 +16,7 @@ import { createEngine } from './engine/index.js';
 // import { StorageManager } from './storage-manager.js';
 
 // We'll initialize storage manager dynamically
-let storageManager = null; // kept as let for late dynamic init across modules
+const storageManager = null; // kept as let for late dynamic init across modules
 
 /**
  * PDF Compressor PWA - Main Application Class
@@ -212,7 +212,7 @@ class PDFCompressorApp {
       let imageCount = '0';
       try {
         imageCount = String(await this.pdfProcessor.estimateTotalImages(result.pdfDoc));
-      } catch {}
+      } catch (e) { /* noop: image estimation is best-effort */ }
       this.uiController.showFileInfo({ ...result.metadata, imageCount });
       // Keep Process button enabled after metadata is loaded
       if (processBtn) processBtn.disabled = false;
@@ -656,6 +656,11 @@ class PDFCompressorApp {
    * Register service worker for PWA functionality
    */
   async registerServiceWorker() {
+    // Skip SW in desktop (Electron)
+    if (typeof window !== 'undefined' && window.desktop) {
+      console.log('[PDFCompressor] Desktop mode – skipping Service Worker');
+      return;
+    }
     if ('serviceWorker' in navigator) {
       try {
         this.serviceWorkerRegistration = await navigator.serviceWorker.register('./service-worker.js');
@@ -766,7 +771,7 @@ class PDFCompressorApp {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       this.deferredPrompt = null;
-      try { this.uiController.hideInstallPrompt(); } catch {}
+      try { this.uiController.hideInstallPrompt(); } catch (e) { /* noop: banner may not exist */ }
     });
   }
 

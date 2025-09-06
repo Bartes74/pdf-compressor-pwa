@@ -14,28 +14,28 @@ export class UIController {
     if (UIController.instance) {
       return UIController.instance;
     }
-    
+
     // DOM element cache
     this.elements = {};
-    
+
     // Reference to main app
     this.app = null;
-    
+
     // State management
     this.state = {
       isDragging: false,
       isProcessing: false,
       isMobile: window.innerWidth <= 768,
       darkMode: this.detectSystemTheme() === 'dark',
-      currentTheme: this.detectSystemTheme()
+      currentTheme: this.detectSystemTheme(),
     };
-    
+
     // Animation frame references
     this.animationFrame = null;
-    
+
     // Initialize the UI controller
     this.init();
-    
+
     // Set instance for singleton pattern
     UIController.instance = this;
   }
@@ -45,26 +45,33 @@ export class UIController {
    */
   init() {
     console.log('[UIController] Initializing UI controller');
-    
+
     // Cache DOM elements
     this.cacheElements();
-    
+
     // Bind event handlers
     this.bindEvents();
-    
+
     // Setup observers
     this.setupObservers();
-    
+
     // Apply initial theme
     this.applyTheme();
     // Force hide install banner if present
-    try { const el = document.getElementById('installBanner'); if (el) el.style.display = 'none'; } catch (e) {}
-    
+    try {
+      const el = document.getElementById('installBanner');
+      if (el) el.style.display = 'none';
+    } catch (e) {
+      /* noop */
+    }
+
     // Handle initial responsive state
     this.handleResize();
 
     // Initialize processing options based on the active tab
-    const activeTab = Array.from(this.elements.tabs || []).find(t => t.classList.contains('active'));
+    const activeTab = Array.from(this.elements.tabs || []).find(t =>
+      t.classList.contains('active')
+    );
     if (activeTab) {
       this.applyActiveTabOptions(activeTab.getAttribute('data-tab'));
     }
@@ -75,7 +82,7 @@ export class UIController {
    */
   cacheElements() {
     console.log('[UIController] Caching DOM elements');
-    
+
     // Upload area elements
     this.elements.dropArea = document.getElementById('dropArea');
     this.elements.fileInput = document.getElementById('fileInput');
@@ -85,7 +92,7 @@ export class UIController {
     this.elements.fileSize = document.getElementById('fileSize');
     this.elements.pageCount = document.getElementById('pageCount');
     this.elements.imageCount = document.getElementById('imageCount');
-    
+
     // Option panel elements
     this.elements.tabs = document.querySelectorAll('.tab');
     this.elements.tabPanes = document.querySelectorAll('.tab-pane');
@@ -97,32 +104,38 @@ export class UIController {
     this.elements.fileSizeLimit = document.getElementById('fileSizeLimit');
     this.elements.pagesInput = document.getElementById('pagesInput');
     this.elements.sizeInput = document.getElementById('sizeInput');
-    
+
     // Action buttons
     this.elements.resetBtn = document.getElementById('resetBtn');
     this.elements.processBtn = document.getElementById('processBtn');
-    
+
     // Progress elements
     this.elements.progressSection = document.getElementById('progressSection');
     this.elements.progressFill = document.getElementById('progressFill');
     this.elements.progressText = document.getElementById('progressText');
-    
+
     // Results elements
     this.elements.resultsSection = document.getElementById('resultsSection');
     this.elements.originalSize = document.getElementById('originalSize');
     this.elements.compressedSize = document.getElementById('compressedSize');
     this.elements.savings = document.getElementById('savings');
-    this.elements.originalDownload = document.getElementById('originalDownload');
-    this.elements.compressedDownload = document.getElementById('compressedDownload');
-    
+    this.elements.originalDownload =
+      document.getElementById('originalDownload');
+    this.elements.compressedDownload =
+      document.getElementById('compressedDownload');
+
     // Notification elements
     this.elements.installBanner = document.getElementById('installBanner');
-    this.elements.offlineNotification = document.getElementById('offlineNotification');
+    this.elements.offlineNotification = document.getElementById(
+      'offlineNotification'
+    );
     this.elements.installBtn = document.getElementById('installBtn');
-    this.elements.closeInstallBanner = document.getElementById('closeInstallBanner');
-    
+    this.elements.closeInstallBanner =
+      document.getElementById('closeInstallBanner');
+
     // Mobile menu elements
-    this.elements.mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    this.elements.mobileMenuToggle =
+      document.getElementById('mobileMenuToggle');
     this.elements.mobileMenu = document.getElementById('mobileMenu');
   }
 
@@ -131,7 +144,7 @@ export class UIController {
    */
   bindEvents() {
     console.log('[UIController] Binding event handlers');
-    
+
     // Upload handling events
     if (this.elements.browseBtn) {
       this.elements.browseBtn.addEventListener('click', () => {
@@ -140,71 +153,71 @@ export class UIController {
         }
       });
     }
-    
+
     if (this.elements.fileInput) {
-      this.elements.fileInput.addEventListener('change', (e) => {
+      this.elements.fileInput.addEventListener('change', e => {
         this.handleFileSelect(e);
       });
     }
-    
+
     if (this.elements.dropArea) {
-      this.elements.dropArea.addEventListener('dragover', (e) => {
+      this.elements.dropArea.addEventListener('dragover', e => {
         e.preventDefault();
         this.updateUploadArea(true);
       });
-      
+
       this.elements.dropArea.addEventListener('dragleave', () => {
         this.updateUploadArea(false);
       });
-      
-      this.elements.dropArea.addEventListener('drop', (e) => {
+
+      this.elements.dropArea.addEventListener('drop', e => {
         e.preventDefault();
         this.updateUploadArea(false);
         this.handleDrop(e);
       });
     }
-    
+
     // Tab navigation
     this.setupTabs();
-    
+
     // Option controls
     this.setupOptionControls();
-    
+
     // Action buttons
     if (this.elements.resetBtn) {
       this.elements.resetBtn.addEventListener('click', () => {
         this.resetApp();
       });
     }
-    
+
     if (this.elements.processBtn) {
       this.elements.processBtn.addEventListener('click', () => {
         this.handleProcess();
       });
     }
-    
+
     // Install banner events
     if (this.elements.installBtn) {
       this.elements.installBtn.addEventListener('click', () => {
         this.handleInstall();
       });
     }
-    
+
     if (this.elements.closeInstallBanner) {
       this.elements.closeInstallBanner.addEventListener('click', () => {
         this.hideInstallPrompt();
       });
     }
-    
+
     // Mobile menu
     if (this.elements.mobileMenuToggle) {
       this.elements.mobileMenuToggle.addEventListener('click', () => {
         this.toggleMobileMenu();
       });
     }
-    
+
     // Keyboard navigation
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       this.handleKeyboardNavigation(e);
     });
   }
@@ -214,26 +227,34 @@ export class UIController {
    */
   setupObservers() {
     console.log('[UIController] Setting up observers');
-    
+
     // Resize observer for responsive design
-    window.addEventListener('resize', this.debounce(() => {
-      this.handleResize();
-    }, 250));
-    
+    window.addEventListener(
+      'resize',
+      this.debounce(() => {
+        this.handleResize();
+      }, 250)
+    );
+
     // Intersection observer for animations
     if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('visible');
-          }
-        });
-      }, {
-        threshold: 0.1
-      });
-      
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+            }
+          });
+        },
+        {
+          threshold: 0.1,
+        }
+      );
+
       // Observe relevant elements
-      const observeElements = document.querySelectorAll('.upload-container, .options-section, .results-section');
+      const observeElements = document.querySelectorAll(
+        '.upload-container, .options-section, .results-section'
+      );
       observeElements.forEach(el => observer.observe(el));
     }
   }
@@ -246,9 +267,9 @@ export class UIController {
    */
   updateUploadArea(isDragging) {
     if (!this.elements.dropArea) return;
-    
+
     this.state.isDragging = isDragging;
-    
+
     if (isDragging) {
       this.elements.dropArea.classList.add('drag-over');
       this.triggerAnimation('upload-drag-over');
@@ -264,27 +285,31 @@ export class UIController {
    */
   showFileInfo(metadata) {
     if (!this.elements.fileInfoPanel) return;
-    
+
     // Update file info display
     if (this.elements.fileName) {
       this.elements.fileName.textContent = metadata.fileName || 'Unknown';
     }
-    
+
     if (this.elements.fileSize) {
-      this.elements.fileSize.textContent = this.formatFileSize(metadata.fileSize || 0);
+      this.elements.fileSize.textContent = this.formatFileSize(
+        metadata.fileSize || 0
+      );
     }
-    
+
     if (this.elements.pageCount) {
-      this.elements.pageCount.textContent = metadata.pageCount || 'Calculating...';
+      this.elements.pageCount.textContent =
+        metadata.pageCount || 'Calculating...';
     }
-    
+
     if (this.elements.imageCount) {
-      this.elements.imageCount.textContent = metadata.imageCount || 'Analyzing...';
+      this.elements.imageCount.textContent =
+        metadata.imageCount || 'Analyzing...';
     }
-    
+
     // Show file info panel
     this.elements.fileInfoPanel.style.display = 'block';
-    
+
     // Trigger animation
     this.triggerAnimation('file-info-show');
   }
@@ -297,17 +322,17 @@ export class UIController {
     if (this.elements.fileInfoPanel) {
       this.elements.fileInfoPanel.style.display = 'none';
     }
-    
+
     // Reset file input
     if (this.elements.fileInput) {
       this.elements.fileInput.value = '';
     }
-    
+
     // Show drop area
     if (this.elements.dropArea) {
       this.elements.dropArea.style.display = 'block';
     }
-    
+
     // Trigger animation
     this.triggerAnimation('upload-reset');
   }
@@ -342,18 +367,20 @@ export class UIController {
     // Call the actual app to process the file
     console.log('[UIController] File selected:', file.name);
     console.log('[UIController] App reference:', this.app);
-    
+
     if (this.app) {
       console.log('[UIController] Calling app.handleFileSelection');
       this.app.handleFileSelection(file);
     } else {
-      console.warn('[UIController] No app reference available for file processing');
+      console.warn(
+        '[UIController] No app reference available for file processing'
+      );
       // Fallback to mock data if app is not available
       this.showFileInfo({
         fileName: file.name,
         fileSize: file.size,
         pageCount: Math.floor(Math.random() * 100) + 1,
-        imageCount: Math.floor(Math.random() * 20) + 1
+        imageCount: Math.floor(Math.random() * 20) + 1,
       });
     }
   }
@@ -365,7 +392,7 @@ export class UIController {
    */
   setupTabs() {
     if (!this.elements.tabs || !this.elements.tabPanes) return;
-    
+
     this.elements.tabs.forEach(tab => {
       tab.addEventListener('click', () => {
         this.switchTab(tab);
@@ -383,17 +410,17 @@ export class UIController {
     // Remove active class from all tabs and panes
     this.elements.tabs.forEach(t => t.classList.remove('active'));
     this.elements.tabPanes.forEach(p => p.classList.remove('active'));
-    
+
     // Add active class to clicked tab
     clickedTab.classList.add('active');
-    
+
     // Show corresponding pane
     const tabId = clickedTab.getAttribute('data-tab');
     const pane = document.getElementById(`${tabId}Tab`);
     if (pane) {
       pane.classList.add('active');
     }
-    
+
     // Trigger animation
     this.triggerAnimation('tab-switch');
   }
@@ -408,23 +435,25 @@ export class UIController {
       this.app.updateProcessingOptions({
         imageCompression: true,
         removeImages: false,
-        splitPDF: false
+        splitPDF: false,
       });
     } else if (tabId === 'removal') {
       this.app.updateProcessingOptions({
         imageCompression: false,
         removeImages: true,
-        splitPDF: false
+        splitPDF: false,
       });
     } else if (tabId === 'split') {
       let method = 'pages';
-      if (this.elements.splitBySize && this.elements.splitBySize.checked) method = 'size';
-      if (this.elements.splitByPages && this.elements.splitByPages.checked) method = 'pages';
+      if (this.elements.splitBySize && this.elements.splitBySize.checked)
+        method = 'size';
+      if (this.elements.splitByPages && this.elements.splitByPages.checked)
+        method = 'pages';
       this.app.updateProcessingOptions({
         imageCompression: false,
         removeImages: false,
         splitPDF: true,
-        splitMethod: method
+        splitMethod: method,
       });
     }
   }
@@ -434,10 +463,10 @@ export class UIController {
    */
   setupOptionControls() {
     console.log('[UIController] Setting up option controls');
-    
+
     // Quality slider
     if (this.elements.qualitySlider && this.elements.qualityValue) {
-      this.elements.qualitySlider.addEventListener('input', (e) => {
+      this.elements.qualitySlider.addEventListener('input', e => {
         this.elements.qualityValue.textContent = e.target.value;
         if (this.app) {
           const quality = Math.max(10, Math.min(100, Number(e.target.value)));
@@ -445,7 +474,7 @@ export class UIController {
         }
       });
     }
-    
+
     // Split method radio buttons
     if (this.elements.splitByPages) {
       this.elements.splitByPages.addEventListener('change', () => {
@@ -455,7 +484,7 @@ export class UIController {
         }
       });
     }
-    
+
     if (this.elements.splitBySize) {
       this.elements.splitBySize.addEventListener('change', () => {
         this.showSplitInput('size');
@@ -467,16 +496,18 @@ export class UIController {
 
     // Page range input
     if (this.elements.pageRange) {
-      this.elements.pageRange.addEventListener('input', (e) => {
+      this.elements.pageRange.addEventListener('input', e => {
         if (this.app) {
-          this.app.updateProcessingOptions({ pageRange: String(e.target.value || '').trim() });
+          this.app.updateProcessingOptions({
+            pageRange: String(e.target.value || '').trim(),
+          });
         }
       });
     }
-    
+
     // File size limit input
     if (this.elements.fileSizeLimit) {
-      this.elements.fileSizeLimit.addEventListener('input', (e) => {
+      this.elements.fileSizeLimit.addEventListener('input', e => {
         if (this.app) {
           const parsed = this.parseSizeToMB(String(e.target.value || ''));
           const val = Math.max(1, Math.min(500, parsed));
@@ -497,8 +528,10 @@ export class UIController {
     if (!isFinite(num)) return 10;
     if (str.includes('gb')) return Math.max(1, Math.round(num * 1024));
     if (str.includes('g')) return Math.max(1, Math.round(num * 1024));
-    if (str.includes('mb') || str.endsWith('m')) return Math.max(1, Math.round(num));
-    if (str.includes('kb') || str.endsWith('k')) return Math.max(1, Math.round(num / 1024));
+    if (str.includes('mb') || str.endsWith('m'))
+      return Math.max(1, Math.round(num));
+    if (str.includes('kb') || str.endsWith('k'))
+      return Math.max(1, Math.round(num / 1024));
     if (str.includes('b')) return Math.max(1, Math.round(num / (1024 * 1024)));
     // Default: treat as MB if unitless
     return Math.max(1, Math.round(num));
@@ -510,7 +543,7 @@ export class UIController {
    */
   showSplitInput(method) {
     if (!this.elements.pagesInput || !this.elements.sizeInput) return;
-    
+
     if (method === 'pages') {
       this.elements.pagesInput.style.display = 'block';
       this.elements.sizeInput.style.display = 'none';
@@ -529,14 +562,14 @@ export class UIController {
     if (this.elements.progressSection) {
       this.elements.progressSection.style.display = 'block';
     }
-    
+
     // Hide other sections
     if (this.elements.fileInfoPanel) {
       this.elements.fileInfoPanel.style.display = 'none';
     }
-    
+
     this.state.isProcessing = true;
-    
+
     // Trigger animation
     this.triggerAnimation('progress-show');
   }
@@ -550,11 +583,12 @@ export class UIController {
     if (this.elements.progressFill) {
       this.elements.progressFill.style.width = `${percent}%`;
     }
-    
+
     if (this.elements.progressText) {
-      this.elements.progressText.textContent = message || `Processing... ${percent}%`;
+      this.elements.progressText.textContent =
+        message || `Processing... ${percent}%`;
     }
-    
+
     // Trigger animation
     this.triggerAnimation('progress-update');
   }
@@ -566,9 +600,9 @@ export class UIController {
     if (this.elements.progressSection) {
       this.elements.progressSection.style.display = 'none';
     }
-    
+
     this.state.isProcessing = false;
-    
+
     // Trigger animation
     this.triggerAnimation('progress-hide');
   }
@@ -581,81 +615,114 @@ export class UIController {
    */
   showResults(files) {
     if (!this.elements.resultsSection) return;
-    
+
     // Hide progress
     this.hideProgress();
-    
+
     // Validate files object
     if (!files || !files.processedFile) {
       console.error('[UIController] Invalid files object for results:', files);
       this.showNotification('Processing failed - invalid result data', 'error');
       return;
     }
-    
+
     // Validate file sizes
     if (files.originalFile && files.processedFile) {
-      console.log(`[UIController] File sizes - Original: ${files.originalFile.size}, Processed: ${files.processedFile.size}`);
-      
+      console.log(
+        `[UIController] File sizes - Original: ${files.originalFile.size}, Processed: ${files.processedFile.size}`
+      );
+
       // Check for potential issues with large files
-      if (files.originalFile.size > 100 * 1024 * 1024 && files.processedFile.size < 1024) {
+      if (
+        files.originalFile.size > 100 * 1024 * 1024 &&
+        files.processedFile.size < 1024
+      ) {
         // Original file is >100MB but processed file is <1KB - likely an error
-        console.warn('[UIController] Potential issue: Large original file but very small processed file');
-        this.showNotification('Warning: Processed file seems unusually small. There may have been an error during processing.', 'warning');
+        console.warn(
+          '[UIController] Potential issue: Large original file but very small processed file'
+        );
+        this.showNotification(
+          'Warning: Processed file seems unusually small. There may have been an error during processing.',
+          'warning'
+        );
       }
     }
-    
+
     // Show results section
     this.elements.resultsSection.style.display = 'block';
-    
+
     // Update results display
     if (files.originalFile && this.elements.originalSize) {
-      this.elements.originalSize.textContent = this.formatFileSize(files.originalFile.size);
+      this.elements.originalSize.textContent = this.formatFileSize(
+        files.originalFile.size
+      );
     }
-    
+
     if (files.processedFile && this.elements.compressedSize) {
-      this.elements.compressedSize.textContent = this.formatFileSize(files.processedFile.size);
+      this.elements.compressedSize.textContent = this.formatFileSize(
+        files.processedFile.size
+      );
     }
-    
+
     if (files.savings && this.elements.savings) {
-      this.elements.savings.textContent = this.formatFileSize(files.savings.savingsBytes) + 
+      this.elements.savings.textContent =
+        this.formatFileSize(files.savings.savingsBytes) +
         ` (${files.savings.savingsPercentage}% reduction)`;
     }
-    
+
     // Setup download handlers with error handling
     if (this.elements.originalDownload) {
       // Remove any existing event listeners to prevent duplicates
       const clone = this.elements.originalDownload.cloneNode(true);
-      this.elements.originalDownload.parentNode.replaceChild(clone, this.elements.originalDownload);
+      this.elements.originalDownload.parentNode.replaceChild(
+        clone,
+        this.elements.originalDownload
+      );
       this.elements.originalDownload = clone;
-      
-      this.elements.originalDownload.addEventListener('click', (e) => {
+
+      this.elements.originalDownload.addEventListener('click', e => {
         e.preventDefault();
         try {
           this.handleDownload(files.originalFile);
         } catch (error) {
-          console.error('[UIController] Error downloading original file:', error);
-          this.showNotification('Failed to download original file: ' + error.message, 'error');
+          console.error(
+            '[UIController] Error downloading original file:',
+            error
+          );
+          this.showNotification(
+            'Failed to download original file: ' + error.message,
+            'error'
+          );
         }
       });
     }
-    
+
     if (this.elements.compressedDownload) {
       // Remove any existing event listeners to prevent duplicates
       const clone = this.elements.compressedDownload.cloneNode(true);
-      this.elements.compressedDownload.parentNode.replaceChild(clone, this.elements.compressedDownload);
+      this.elements.compressedDownload.parentNode.replaceChild(
+        clone,
+        this.elements.compressedDownload
+      );
       this.elements.compressedDownload = clone;
-      
-      this.elements.compressedDownload.addEventListener('click', (e) => {
+
+      this.elements.compressedDownload.addEventListener('click', e => {
         e.preventDefault();
         try {
           this.handleDownload(files.processedFile);
         } catch (error) {
-          console.error('[UIController] Error downloading processed file:', error);
-          this.showNotification('Failed to download processed file: ' + error.message, 'error');
+          console.error(
+            '[UIController] Error downloading processed file:',
+            error
+          );
+          this.showNotification(
+            'Failed to download processed file: ' + error.message,
+            'error'
+          );
         }
       });
     }
-    
+
     // Trigger animation
     this.triggerAnimation('results-show');
   }
@@ -668,7 +735,7 @@ export class UIController {
   createResultCard(file) {
     const card = document.createElement('div');
     card.className = 'result-card';
-    
+
     card.innerHTML = `
       <div class="result-card-header">
         <h4>${file.name}</h4>
@@ -678,7 +745,7 @@ export class UIController {
         <button class="download-btn" data-file-id="${file.id}">Download</button>
       </div>
     `;
-    
+
     return card;
   }
 
@@ -692,15 +759,32 @@ export class UIController {
       this.showNotification('No file to download', 'error');
       return;
     }
-    
+
     // Validate file object
     if (!(file instanceof File) && !(file instanceof Blob)) {
       console.error('[UIController] Invalid file object for download:', file);
       this.showNotification('Invalid file object', 'error');
       return;
     }
-    
+
     try {
+      // Desktop path: native save via IPC
+      if (
+        window.desktop &&
+        typeof window.desktop.chooseDirectory === 'function'
+      ) {
+        (async () => {
+          const dir = await window.desktop.chooseDirectory();
+          if (!dir) return;
+          const data = new Uint8Array(await file.arrayBuffer());
+          await window.desktop.saveFiles(dir, [
+            { name: file.name || 'output.pdf', data },
+          ]);
+          this.triggerAnimation('file-download');
+        })();
+        return;
+      }
+
       // Create download link
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
@@ -708,18 +792,21 @@ export class UIController {
       a.download = file.name || 'download.pdf';
       document.body.appendChild(a);
       a.click();
-      
+
       // Clean up
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 100);
-      
+
       // Trigger animation
       this.triggerAnimation('file-download');
     } catch (error) {
       console.error('[UIController] Error creating download link:', error);
-      this.showNotification('Failed to create download link. File may be corrupted.', 'error');
+      this.showNotification(
+        'Failed to create download link. File may be corrupted.',
+        'error'
+      );
     }
   }
 
@@ -730,7 +817,7 @@ export class UIController {
     if (this.elements.resultsSection) {
       this.elements.resultsSection.style.display = 'none';
     }
-    
+
     // Trigger animation
     this.triggerAnimation('results-clear');
   }
@@ -747,7 +834,7 @@ export class UIController {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
-    
+
     // Add close button
     const closeBtn = document.createElement('button');
     closeBtn.innerHTML = '&times;';
@@ -755,19 +842,19 @@ export class UIController {
     closeBtn.addEventListener('click', () => {
       notification.remove();
     });
-    
+
     notification.appendChild(closeBtn);
-    
+
     // Add to document
     document.body.appendChild(notification);
-    
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
       if (notification.parentNode) {
         notification.remove();
       }
     }, 5000);
-    
+
     // Trigger animation
     this.triggerAnimation('notification-show');
   }
@@ -780,7 +867,8 @@ export class UIController {
     try {
       // Remove existing modal/backdrop if present to avoid duplicates
       const existing = document.getElementById('modal-backdrop');
-      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      if (existing && existing.parentNode)
+        existing.parentNode.removeChild(existing);
 
       const backdrop = document.createElement('div');
       backdrop.id = 'modal-backdrop';
@@ -808,7 +896,7 @@ export class UIController {
         setTimeout(() => ok.focus(), 0);
       }
 
-      const onKey = (e) => {
+      const onKey = e => {
         if (e.key === 'Escape') {
           this.closeModal();
         }
@@ -822,7 +910,8 @@ export class UIController {
 
   closeModal() {
     const backdrop = document.getElementById('modal-backdrop');
-    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    if (backdrop && backdrop.parentNode)
+      backdrop.parentNode.removeChild(backdrop);
   }
 
   /**
@@ -833,7 +922,7 @@ export class UIController {
       this.elements.offlineNotification.style.display = 'block';
       this.elements.offlineNotification.classList.add('visible');
     }
-    
+
     // Trigger animation
     this.triggerAnimation('offline-show');
   }
@@ -846,7 +935,7 @@ export class UIController {
       this.elements.offlineNotification.style.display = 'none';
       this.elements.offlineNotification.classList.remove('visible');
     }
-    
+
     // Trigger animation
     this.triggerAnimation('offline-hide');
   }
@@ -855,8 +944,11 @@ export class UIController {
    * Show update available notification
    */
   showUpdateAvailable() {
-    this.showNotification('A new version is available. Please refresh to update.', 'info');
-    
+    this.showNotification(
+      'A new version is available. Please refresh to update.',
+      'info'
+    );
+
     // Trigger animation
     this.triggerAnimation('update-show');
   }
@@ -869,7 +961,7 @@ export class UIController {
       this.elements.installBanner.style.display = 'flex';
       this.elements.installBanner.classList.add('visible');
     }
-    
+
     // Trigger animation
     this.triggerAnimation('install-show');
   }
@@ -882,7 +974,7 @@ export class UIController {
       this.elements.installBanner.style.display = 'none';
       this.elements.installBanner.classList.remove('visible');
     }
-    
+
     // Trigger animation
     this.triggerAnimation('install-hide');
   }
@@ -893,10 +985,10 @@ export class UIController {
   handleInstall() {
     // In a real implementation, this would trigger the PWA install prompt
     console.log('[UIController] Install button clicked');
-    
+
     // For now, we'll just hide the banner
     this.hideInstallPrompt();
-    
+
     // Trigger animation
     this.triggerAnimation('install-handle');
   }
@@ -908,10 +1000,10 @@ export class UIController {
    */
   handleResize() {
     this.state.isMobile = window.innerWidth <= 768;
-    
+
     // Adapt layout
     this.adaptLayout();
-    
+
     // Trigger animation
     this.triggerAnimation('resize');
   }
@@ -928,7 +1020,7 @@ export class UIController {
         this.elements.mobileMenu.classList.add('open');
       }
     }
-    
+
     // Trigger animation
     this.triggerAnimation('mobile-menu-toggle');
   }
@@ -946,7 +1038,7 @@ export class UIController {
         container.classList.remove('mobile-layout');
       }
     }
-    
+
     // Trigger animation
     this.triggerAnimation('layout-adapt');
   }
@@ -962,11 +1054,11 @@ export class UIController {
     if (e.key === 'Escape') {
       // Close modals, menus, etc.
       this.hideInstallPrompt();
-      
+
       // Trigger animation
       this.triggerAnimation('escape-key');
     }
-    
+
     // Handle Tab key for focus management
     if (e.key === 'Tab') {
       this.manageFocus(e);
@@ -1010,7 +1102,7 @@ export class UIController {
       liveRegion.style.left = '-10000px';
       document.body.appendChild(liveRegion);
     }
-    
+
     // Set message
     liveRegion.textContent = message;
   }
@@ -1026,7 +1118,7 @@ export class UIController {
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
     }
-    
+
     // Trigger animation
     this.animationFrame = requestAnimationFrame(() => {
       console.log(`[UIController] Animation triggered: ${animationName}`);
@@ -1061,7 +1153,7 @@ export class UIController {
     this.state.darkMode = !this.state.darkMode;
     this.applyTheme();
     this.savePreference();
-    
+
     // Trigger animation
     this.triggerAnimation('theme-toggle');
   }
@@ -1082,7 +1174,10 @@ export class UIController {
    */
   savePreference() {
     try {
-      localStorage.setItem('pdf-compressor-theme', this.state.darkMode ? 'dark' : 'light');
+      localStorage.setItem(
+        'pdf-compressor-theme',
+        this.state.darkMode ? 'dark' : 'light'
+      );
     } catch (e) {
       console.warn('[UIController] Could not save theme preference:', e);
     }
@@ -1093,7 +1188,10 @@ export class UIController {
    * @returns {string} - 'dark' or 'light'
    */
   detectSystemTheme() {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    if (
+      window.matchMedia &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches
+    ) {
       return 'dark';
     }
     return 'light';
@@ -1108,11 +1206,11 @@ export class UIController {
    */
   formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
@@ -1122,7 +1220,7 @@ export class UIController {
   handleProcess() {
     console.log('[UIController] Process button clicked');
     console.log('[UIController] App reference:', this.app);
-    
+
     if (this.app) {
       console.log('[UIController] Calling app.processPDF');
       this.app.processPDF();
@@ -1130,20 +1228,20 @@ export class UIController {
       console.warn('[UIController] No app reference available for processing');
       // Fallback simulation if app is not available
       this.showProgress();
-      
+
       // Simulate processing
       let progress = 0;
       const interval = setInterval(() => {
         progress += 5;
         this.updateProgress(progress, `Processing... ${progress}%`);
-        
+
         if (progress >= 100) {
           clearInterval(interval);
           // In a real implementation, this would show actual results
           this.showResults({
             originalFile: { size: 1000000, name: 'original.pdf' },
             processedFile: { size: 700000, name: 'compressed.pdf' },
-            savings: { savingsBytes: 300000, savingsPercentage: '30.00' }
+            savings: { savingsBytes: 300000, savingsPercentage: '30.00' },
           });
         }
       }, 100);
@@ -1155,12 +1253,12 @@ export class UIController {
    */
   resetApp() {
     console.log('[UIController] Resetting application');
-    
+
     // Reset UI
     this.resetUploadArea();
     this.hideProgress();
     this.clearResults();
-    
+
     // Trigger animation
     this.triggerAnimation('app-reset');
   }
