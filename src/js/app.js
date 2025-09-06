@@ -102,6 +102,13 @@ class PDFCompressorApp {
       // Setup lazy loading for PDF libraries
       this.setupLazyLoading();
       
+      // Initialize storage early so IndexedDB is ready before any operations
+      try {
+        await this.getStorageManager();
+      } catch (e) {
+        console.warn('[PDFCompressor] Storage manager init warning:', e);
+      }
+      
       console.log('[PDFCompressor] Application initialized successfully');
     } catch (error) {
       console.error('[PDFCompressor] Initialization error:', error);
