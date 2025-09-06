@@ -14,6 +14,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,4 +51,24 @@ jobs:
         with:
           name: windows-portable-zip
           path: dist/*.zip
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          echo "VERSION=$($pkg.version)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Create GitHub Release (draft, Windows)
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}-${{ github.run_number }}-win
+          name: PDF Compressor v${{ env.VERSION }} (Windows build ${{ github.run_number }})
+          draft: true
+          prerelease: true
+          files: |
+            dist/*.exe
+            dist/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
