@@ -108,7 +108,7 @@
         "zip"
       ],
       "icon": "build/icon.ico",
-      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-${os}-${arch}-${target}.${ext}"
     },
     "nsis": {
       "oneClick": true,
