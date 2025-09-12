@@ -1,10 +1,10 @@
 // Loading indicators
-window.showLoadingLibraries = function() {
+window.showLoadingLibraries = function () {
   const loader = document.getElementById('library-loader');
   if (loader) loader.style.display = 'block';
 };
 
-window.hideLoadingLibraries = function() {
+window.hideLoadingLibraries = function () {
   const loader = document.getElementById('library-loader');
   if (loader) loader.style.display = 'none';
 };
@@ -33,7 +33,7 @@ class PDFCompressorApp {
     this.uiController = null;
     this.worker = null;
     this.engine = null;
-    
+
     // Application state
     this.state = {
       currentFile: null,
@@ -45,28 +45,28 @@ class PDFCompressorApp {
         splitPDF: false,
         splitMethod: 'pages',
         pageRange: '',
-        fileSizeLimit: 10
+        fileSizeLimit: 10,
       },
       processingQueue: [],
       isOnline: navigator.onLine,
       isProcessing: false,
-      isVisible: true
+      isVisible: true,
     };
-    
+
     // PDF libraries loading state
     this.pdfLibrariesLoaded = false;
-    
+
     // Performance tracking
     this.performance = {
       startTime: null,
       endTime: null,
-      memoryUsage: null
+      memoryUsage: null,
     };
-    
+
     // PWA features
     this.deferredPrompt = null;
     this.serviceWorkerRegistration = null;
-    
+
     // Initialize the application
     this.initializeApp();
   }
@@ -78,41 +78,43 @@ class PDFCompressorApp {
   async initializeApp() {
     try {
       console.log('[PDFCompressor] Initializing application...');
-      
+
       // Check for required API support
       if (!this.checkAPISupport()) {
         throw new Error('Required APIs not supported in this browser');
       }
-      
+
       // Setup basic UI first
       this.setupBasicUI();
-      
+
       // Register service worker for PWA functionality
       await this.registerServiceWorker();
-      
+
       // Setup PWA features
       this.setupPWAFeatures();
-      
+
       // Handle file sharing if launched from share target
       this.handleShareTarget();
-      
+
       // Handle file opening if launched from file handler
       this.handleFileHandler();
-      
+
       // Setup lazy loading for PDF libraries
       this.setupLazyLoading();
-      
+
       // Initialize storage early so IndexedDB is ready before any operations
       try {
         await this.getStorageManager();
       } catch (e) {
         console.warn('[PDFCompressor] Storage manager init warning:', e);
       }
-      
+
       console.log('[PDFCompressor] Application initialized successfully');
     } catch (error) {
       console.error('[PDFCompressor] Initialization error:', error);
-      this.showErrorMessage('Failed to initialize application: ' + error.message);
+      this.showErrorMessage(
+        'Failed to initialize application: ' + error.message
+      );
     }
   }
 
@@ -122,16 +124,16 @@ class PDFCompressorApp {
   setupBasicUI() {
     // Initialize UI controller
     this.uiController = new UIController();
-    
+
     // Set reference to app in UI controller
     this.uiController.setApp(this);
-    
+
     // Initialize processing engine (feature-flagged)
     this.engine = createEngine(this);
-    
+
     // Wire optional remove-images option in UI if present
     this.setupRemoveImagesOption();
-    
+
     // Setup event listeners
     this.setupEventListeners();
   }
@@ -146,7 +148,12 @@ class PDFCompressorApp {
       if (removeToggle && removeOption) {
         removeOption.addEventListener('click', () => {
           const next = !this.state.processingOptions.removeImages;
-          this.updateProcessingOptions({ removeImages: next, imageCompression: next ? false : this.state.processingOptions.imageCompression });
+          this.updateProcessingOptions({
+            removeImages: next,
+            imageCompression: next
+              ? false
+              : this.state.processingOptions.imageCompression,
+          });
           removeToggle.classList.toggle('active');
           const compressToggle = document.getElementById('compressToggle');
           if (next && compressToggle) compressToggle.classList.remove('active');
@@ -164,11 +171,11 @@ class PDFCompressorApp {
     // Load libraries when user selects a file or drops a file
     const fileInput = document.getElementById('fileInput');
     const dropArea = document.getElementById('dropArea');
-    
+
     const loadLibrariesOnce = async () => {
       if (!this.pdfLibrariesLoaded) {
         this.pdfLibrariesLoaded = await window.loadPDFLibraries();
-        
+
         if (this.pdfLibrariesLoaded) {
           // Initialize PDF processor after loading libraries
           const { PDFProcessor } = await import('./pdf-processor.js');
@@ -176,7 +183,7 @@ class PDFCompressorApp {
         }
       }
     };
-    
+
     fileInput?.addEventListener('change', loadLibrariesOnce, { once: true });
     dropArea?.addEventListener('drop', loadLibrariesOnce, { once: true });
   }
@@ -191,39 +198,45 @@ class PDFCompressorApp {
       if (!this.validateFile(file)) {
         return;
       }
-      
+
       // Set current file in state and show basic info immediately
       this.state.currentFile = file;
       this.uiController.showFileInfo({
         fileName: file.name,
         fileSize: file.size,
         pageCount: 'Calculating...',
-        imageCount: 'Analyzing...'
+        imageCount: 'Analyzing...',
       });
       // Enable Process button now that we have a valid file
       const processBtn = document.getElementById('processBtn');
       if (processBtn) processBtn.disabled = false;
-      
+
       // Ensure PDF libraries are loaded (with graceful error)
       try {
         await this.ensurePDFLibrariesLoaded();
       } catch (e) {
-        this.showErrorMessage(e.message || 'Nie można załadować bibliotek PDF.');
+        this.showErrorMessage(
+          e.message || 'Nie można załadować bibliotek PDF.'
+        );
         return;
       }
-      
+
       // Load PDF document and update detailed metadata + estimate images
       const result = await this.pdfProcessor.loadPDF(file);
       this.state.pdfDocument = result.pdfDoc;
       // Estimate images asynchronously and update UI when ready
       let imageCount = '0';
       try {
-        imageCount = String(await this.pdfProcessor.estimateTotalImages(result.pdfDoc));
-      } catch (e) { /* noop: image estimation is best-effort */ }
+        imageCount = String(
+          await this.pdfProcessor.estimateTotalImages(result.pdfDoc)
+        );
+      } catch (e) {
+        /* noop: image estimation is best-effort */
+      }
       this.uiController.showFileInfo({ ...result.metadata, imageCount });
       // Keep Process button enabled after metadata is loaded
       if (processBtn) processBtn.disabled = false;
-      
+
       console.log(`[PDFCompressor] File loaded: ${file.name}`);
     } catch (error) {
       console.error('[PDFCompressor] Error handling file:', error);
@@ -242,7 +255,9 @@ class PDFCompressorApp {
       return false;
     }
     // Only PDFs
-    const isPdf = file.type === 'application/pdf' || (file.name && file.name.toLowerCase().endsWith('.pdf'));
+    const isPdf =
+      file.type === 'application/pdf' ||
+      (file.name && file.name.toLowerCase().endsWith('.pdf'));
     if (!isPdf) {
       this.showErrorMessage('Obsługiwane są tylko pliki PDF.');
       return false;
@@ -254,7 +269,9 @@ class PDFCompressorApp {
       return false;
     }
     if (file.size > maxBytes) {
-      this.showErrorMessage('Plik jest zbyt duży. Maksymalny rozmiar to 500 MB.');
+      this.showErrorMessage(
+        'Plik jest zbyt duży. Maksymalny rozmiar to 500 MB.'
+      );
       return false;
     }
     return true;
@@ -278,7 +295,9 @@ class PDFCompressorApp {
       // Przeglądarka: CDN loader
       this.pdfLibrariesLoaded = await window.loadPDFLibraries();
       if (!this.pdfLibrariesLoaded) {
-        throw new Error('Nie można załadować bibliotek PDF. Sprawdź połączenie internetowe.');
+        throw new Error(
+          'Nie można załadować bibliotek PDF. Sprawdź połączenie internetowe.'
+        );
       }
       const { PDFProcessor } = await import('./pdf-processor.js');
       this.pdfProcessor = new PDFProcessor();
@@ -290,7 +309,12 @@ class PDFCompressorApp {
    */
   async processPDF() {
     try {
-      console.log('[PDFCompressor] processPDF() called with options:', this.state.processingOptions, 'file:', this.state.currentFile?.name);
+      console.log(
+        '[PDFCompressor] processPDF() called with options:',
+        this.state.processingOptions,
+        'file:',
+        this.state.currentFile?.name
+      );
       // Ensure there is a file selected
       if (!this.state.currentFile) {
         this.showErrorMessage('No PDF file selected');
@@ -302,7 +326,7 @@ class PDFCompressorApp {
         this.showError('Please select at least one processing option');
         return;
       }
-      
+
       // If PDF not yet parsed, load it now
       if (!this.state.pdfDocument) {
         await this.ensurePDFLibrariesLoaded();
@@ -311,25 +335,26 @@ class PDFCompressorApp {
         // Update UI with detailed metadata (page count, etc.)
         this.uiController.showFileInfo(result.metadata);
       }
-      
+
       // Ensure libraries are loaded (idempotent)
       await this.ensurePDFLibrariesLoaded();
-      
+
       this.state.isProcessing = true;
-      
+
       // Start performance tracking
       this.startPerformanceTracking();
-      
+
       // Show progress UI
       this.uiController.showProgress();
-      
+
       // Hook progress callback
-      const progressCallback = (p) => {
-        const percent = typeof p === 'number' ? p : (p && (p.percentage ?? p.percent)) || 0;
+      const progressCallback = p => {
+        const percent =
+          typeof p === 'number' ? p : (p && (p.percentage ?? p.percent)) || 0;
         const message = (p && p.message) || `Processing... ${percent}%`;
         this.uiController.updateProgress(percent, message);
       };
-      
+
       // If removal is selected, use dedicated removal flow (keeps text, removes images)
       if (this.state.processingOptions.removeImages) {
         this.uiController.updateProgress(10, 'Preparing to remove images...');
@@ -338,17 +363,27 @@ class PDFCompressorApp {
           {},
           progressCallback
         );
-        const processedFile = new File([removal.pdfBytes], removal.fileName, { type: 'application/pdf' });
+        const processedFile = new File([removal.pdfBytes], removal.fileName, {
+          type: 'application/pdf',
+        });
         const files = {
           originalFile: this.state.currentFile,
           processedFile,
-          savings: this.pdfProcessor.estimateCompression(this.state.currentFile.size, removal.pdfBytes.length)
+          savings: this.pdfProcessor.estimateCompression(
+            this.state.currentFile.size,
+            removal.pdfBytes.length
+          ),
         };
         // Prefer custom results list UI if present; otherwise use existing UIController view
         const resultsList = document.getElementById('resultsList');
         if (resultsList) {
           this.showResults([
-            { name: removal.fileName, data: removal.pdfBytes, size: removal.pdfBytes.length, stats: removal.stats }
+            {
+              name: removal.fileName,
+              data: removal.pdfBytes,
+              size: removal.pdfBytes.length,
+              stats: removal.stats,
+            },
           ]);
         } else {
           const storageManager = await this.getStorageManager();
@@ -366,26 +401,34 @@ class PDFCompressorApp {
         this.state.processingOptions,
         progressCallback
       );
-      
+
       // Validate result
       if (!result || (!result.processedFile && !result.files)) {
         throw new Error('PDF processing returned invalid result');
       }
-      
+
       // Validate file sizes
       if (result.processedFile.size === 0) {
         throw new Error('Processed file is empty (0 bytes)');
       }
-      
+
       // End performance tracking
       this.endPerformanceTracking();
-      
+
       // Get storage manager (load dynamically if needed)
       const storageManager = await this.getStorageManager();
-      
+
       // If multiple files (split), show list; otherwise single result
-      if (result.files && Array.isArray(result.files) && result.files.length > 0) {
-        const list = result.files.map(f => ({ name: f.name, data: f, size: f.size }));
+      if (
+        result.files &&
+        Array.isArray(result.files) &&
+        result.files.length > 0
+      ) {
+        const list = result.files.map(f => ({
+          name: f.name,
+          data: f,
+          size: f.size,
+        }));
         // Render simple list under results section
         const container = document.getElementById('resultsSection');
         if (container) {
@@ -408,14 +451,19 @@ class PDFCompressorApp {
             left.appendChild(sizeEl);
             const actions = document.createElement('div');
             actions.className = 'split-result-actions';
-            if (window.desktop && typeof window.desktop.chooseDirectory === 'function') {
+            if (
+              window.desktop &&
+              typeof window.desktop.chooseDirectory === 'function'
+            ) {
               const btn = document.createElement('button');
               btn.className = 'button-download';
               btn.textContent = 'Save';
               btn.addEventListener('click', async () => {
                 const dir = await window.desktop.chooseDirectory();
                 if (!dir) return;
-                await window.desktop.saveFiles(dir, [ { name: item.name, data: await item.data.arrayBuffer() } ]);
+                await window.desktop.saveFiles(dir, [
+                  { name: item.name, data: await item.data.arrayBuffer() },
+                ]);
               });
               actions.appendChild(btn);
             } else {
@@ -431,7 +479,10 @@ class PDFCompressorApp {
             row.appendChild(actions);
             wrap.appendChild(row);
           });
-          if (window.desktop && typeof window.desktop.chooseDirectory === 'function') {
+          if (
+            window.desktop &&
+            typeof window.desktop.chooseDirectory === 'function'
+          ) {
             const bulk = document.createElement('div');
             bulk.style.textAlign = 'right';
             const btnAll = document.createElement('button');
@@ -440,7 +491,12 @@ class PDFCompressorApp {
             btnAll.addEventListener('click', async () => {
               const dir = await window.desktop.chooseDirectory();
               if (!dir) return;
-              const files = await Promise.all(list.map(async it => ({ name: it.name, data: await it.data.arrayBuffer() })));
+              const files = await Promise.all(
+                list.map(async it => ({
+                  name: it.name,
+                  data: await it.data.arrayBuffer(),
+                }))
+              );
               await window.desktop.saveFiles(dir, files);
             });
             bulk.appendChild(btnAll);
@@ -454,24 +510,37 @@ class PDFCompressorApp {
         // Show results in UI
         this.uiController.showResults(result);
       }
-      
+
       this.state.isProcessing = false;
     } catch (error) {
       this.state.isProcessing = false;
       console.error('[PDFCompressor] Error processing PDF:', error);
       // Hide progress if visible
-      try { this.uiController.hideProgress(); } catch (e) { /* noop */ }
+      try {
+        this.uiController.hideProgress();
+      } catch (e) {
+        /* noop */
+      }
       // Show localized message
       // Pokaż modal błędu (centrowany, z OK)
-      try { this.uiController.showErrorModal(error?.message || 'Wystąpił błąd'); }
-      catch (e) { this.showErrorMessage('Błąd przetwarzania PDF: ' + (error?.message || error)); }
+      try {
+        this.uiController.showErrorModal(error?.message || 'Wystąpił błąd');
+      } catch (e) {
+        this.showErrorMessage(
+          'Błąd przetwarzania PDF: ' + (error?.message || error)
+        );
+      }
     }
   }
 
   // Lightweight helpers used by alternative upload UI if present
   async handleFileSelect(event) {
     const file = event?.target?.files?.[0];
-    if (file && (file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf'))) {
+    if (
+      file &&
+      (file.type === 'application/pdf' ||
+        file.name?.toLowerCase().endsWith('.pdf'))
+    ) {
       await this.handleFile(file);
     } else if (file) {
       this.showError('Please select a valid PDF file');
@@ -484,7 +553,11 @@ class PDFCompressorApp {
     const uploadArea = document.getElementById('uploadArea');
     if (uploadArea) uploadArea.classList.remove('dragover');
     const file = event.dataTransfer?.files?.[0];
-    if (file && (file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf'))) {
+    if (
+      file &&
+      (file.type === 'application/pdf' ||
+        file.name?.toLowerCase().endsWith('.pdf'))
+    ) {
       await this.handleFile(file);
     } else if (file) {
       this.showError('Please drop a valid PDF file');
@@ -501,7 +574,12 @@ class PDFCompressorApp {
       this.updateFileInfo(file);
       const processBtn = document.getElementById('processBtn');
       if (processBtn) processBtn.disabled = false;
-      console.log('File loaded:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
+      console.log(
+        'File loaded:',
+        file.name,
+        'Size:',
+        (file.size / 1024 / 1024).toFixed(2) + ' MB'
+      );
     } catch (error) {
       console.error('Error handling file:', error);
       this.showError('Error loading file: ' + error.message);
@@ -554,14 +632,21 @@ class PDFCompressorApp {
 
   resetApp() {
     this.state.currentFile = null;
-    this.state.processingOptions = { ...this.state.processingOptions, removeImages: false, imageCompression: false, splitPDF: false };
+    this.state.processingOptions = {
+      ...this.state.processingOptions,
+      removeImages: false,
+      imageCompression: false,
+      splitPDF: false,
+    };
     const fileInfo = document.getElementById('fileInfo');
     if (fileInfo) fileInfo.classList.remove('active');
     const resultsSection = document.getElementById('resultsSection');
     if (resultsSection) resultsSection.classList.remove('active');
     const processBtn = document.getElementById('processBtn');
     if (processBtn) processBtn.disabled = true;
-    document.querySelectorAll('.option-toggle')?.forEach((t) => t.classList.remove('active'));
+    document
+      .querySelectorAll('.option-toggle')
+      ?.forEach(t => t.classList.remove('active'));
     const fileInput = document.getElementById('fileInput');
     if (fileInput) fileInput.value = '';
   }
@@ -601,17 +686,20 @@ class PDFCompressorApp {
   async loadPDFLibraries() {
     try {
       console.log('[PDFCompressor] Loading PDF libraries...');
-      
+
       // Check if libraries are already available globally
-      if (typeof window.PDFLib !== 'undefined' && typeof window.pdfjsLib !== 'undefined') {
+      if (
+        typeof window.PDFLib !== 'undefined' &&
+        typeof window.pdfjsLib !== 'undefined'
+      ) {
         console.log('[PDFCompressor] PDF libraries already loaded from CDN');
-        return { 
-          PDFDocument: window.PDFLib.PDFDocument, 
+        return {
+          PDFDocument: window.PDFLib.PDFDocument,
           rgb: window.PDFLib.rgb,
-          pdfjsLib: window.pdfjsLib
+          pdfjsLib: window.pdfjsLib,
         };
       }
-      
+
       // If not available, we could load them dynamically
       // But in this case, we're relying on the CDN scripts in index.html
       console.log('[PDFCompressor] PDF libraries should be loaded from CDN');
@@ -633,28 +721,28 @@ class PDFCompressorApp {
       'ArrayBuffer',
       'Worker',
       'indexedDB',
-      'caches'
+      'caches',
     ];
-    
+
     for (const api of requiredAPIs) {
       if (!(api in window)) {
         console.error(`[PDFCompressor] Required API not supported: ${api}`);
         return false;
       }
     }
-    
+
     // Check for File API specific methods
     if (!window.FileReader || !window.FileList) {
       console.error('[PDFCompressor] File API not fully supported');
       return false;
     }
-    
+
     // Check for Blob API specific methods
     if (!window.Blob || !Blob.prototype.arrayBuffer) {
       console.error('[PDFCompressor] Blob API not fully supported');
       return false;
     }
-    
+
     console.log('[PDFCompressor] All required APIs supported');
     return true;
   }
@@ -670,16 +758,24 @@ class PDFCompressorApp {
     }
     if ('serviceWorker' in navigator) {
       try {
-        this.serviceWorkerRegistration = await navigator.serviceWorker.register('./service-worker.js');
-        console.log('[PDFCompressor] Service Worker registered:', this.serviceWorkerRegistration);
-        
+        this.serviceWorkerRegistration = await navigator.serviceWorker.register(
+          './service-worker.js'
+        );
+        console.log(
+          '[PDFCompressor] Service Worker registered:',
+          this.serviceWorkerRegistration
+        );
+
         // Listen for updates
         this.serviceWorkerRegistration.addEventListener('updatefound', () => {
           console.log('[PDFCompressor] Service Worker update found');
           this.showUpdateNotification();
         });
       } catch (error) {
-        console.error('[PDFCompressor] Service Worker registration failed:', error);
+        console.error(
+          '[PDFCompressor] Service Worker registration failed:',
+          error
+        );
       }
     } else {
       console.warn('[PDFCompressor] Service Worker not supported');
@@ -694,20 +790,20 @@ class PDFCompressorApp {
     document.addEventListener('DOMContentLoaded', () => {
       console.log('[PDFCompressor] DOM Content Loaded');
     });
-    
+
     // File input and upload area bindings
     const fileInput = document.getElementById('fileInput');
     const uploadArea = document.getElementById('uploadArea');
     if (fileInput) {
-      fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+      fileInput.addEventListener('change', e => this.handleFileSelect(e));
     }
     if (uploadArea) {
       uploadArea.addEventListener('click', () => fileInput?.click());
-      uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
-      uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-      uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
+      uploadArea.addEventListener('dragover', e => this.handleDragOver(e));
+      uploadArea.addEventListener('dragleave', e => this.handleDragLeave(e));
+      uploadArea.addEventListener('drop', e => this.handleDrop(e));
     }
-    
+
     const processBtn = document.getElementById('processBtn');
     if (processBtn) {
       processBtn.addEventListener('click', () => this.processPDF());
@@ -716,7 +812,7 @@ class PDFCompressorApp {
     if (resetBtn) {
       resetBtn.addEventListener('click', () => this.resetApp());
     }
-    
+
     this.setupOptionToggles();
 
     // Online/Offline events
@@ -725,24 +821,29 @@ class PDFCompressorApp {
       this.state.isOnline = true;
       this.updateOnlineStatus();
     });
-    
+
     window.addEventListener('offline', () => {
       console.log('[PDFCompressor] Offline');
       this.state.isOnline = false;
       this.updateOnlineStatus();
     });
-    
+
     // Window resize for responsive UI
-    window.addEventListener('resize', this.debounce(() => {
-      console.log('[PDFCompressor] Window resized');
-      // Trigger UI updates if needed
-    }, 250));
-    
+    window.addEventListener(
+      'resize',
+      this.debounce(() => {
+        console.log('[PDFCompressor] Window resized');
+        // Trigger UI updates if needed
+      }, 250)
+    );
+
     // Visibility change for pause/resume
     document.addEventListener('visibilitychange', () => {
       this.state.isVisible = !document.hidden;
-      console.log(`[PDFCompressor] Visibility changed: ${this.state.isVisible ? 'visible' : 'hidden'}`);
-      
+      console.log(
+        `[PDFCompressor] Visibility changed: ${this.state.isVisible ? 'visible' : 'hidden'}`
+      );
+
       // Pause/resume processing if needed
       if (this.state.isProcessing) {
         if (this.state.isVisible) {
@@ -760,12 +861,20 @@ class PDFCompressorApp {
     if (removeToggle && removeOption) {
       const toggleHandler = () => {
         const next = !this.state.processingOptions.removeImages;
-        this.updateProcessingOptions({ removeImages: next, imageCompression: next ? false : this.state.processingOptions.imageCompression });
+        this.updateProcessingOptions({
+          removeImages: next,
+          imageCompression: next
+            ? false
+            : this.state.processingOptions.imageCompression,
+        });
         removeToggle.classList.toggle('active');
         console.log('Remove images option:', next);
       };
       removeOption.addEventListener('click', toggleHandler);
-      removeToggle.addEventListener('click', (e) => { e.stopPropagation(); toggleHandler(); });
+      removeToggle.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleHandler();
+      });
     }
   }
 
@@ -775,10 +884,14 @@ class PDFCompressorApp {
    */
   setupPWAFeatures() {
     // Disable install prompt banner
-    window.addEventListener('beforeinstallprompt', (e) => {
+    window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
       this.deferredPrompt = null;
-      try { this.uiController.hideInstallPrompt(); } catch (e) { /* noop: banner may not exist */ }
+      try {
+        this.uiController.hideInstallPrompt();
+      } catch (e) {
+        /* noop: banner may not exist */
+      }
     });
   }
 
@@ -789,7 +902,7 @@ class PDFCompressorApp {
     // Check if launched from share target
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
-    
+
     if (action === 'share') {
       console.log('[PDFCompressor] Launched from share target');
       // Handle shared files - would need server-side processing
@@ -804,7 +917,7 @@ class PDFCompressorApp {
     // Check if launched from file handler
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
-    
+
     if (action === 'open') {
       console.log('[PDFCompressor] Launched from file handler');
       // Handle opened files - would need server-side processing
@@ -860,10 +973,16 @@ class PDFCompressorApp {
   endPerformanceTracking() {
     this.performance.endTime = performance.now();
     performance.mark('processing-end');
-    performance.measure('processing-duration', 'processing-start', 'processing-end');
-    
+    performance.measure(
+      'processing-duration',
+      'processing-start',
+      'processing-end'
+    );
+
     const duration = this.performance.endTime - this.performance.startTime;
-    console.log(`[PDFCompressor] Processing completed in ${duration.toFixed(2)}ms`);
+    console.log(
+      `[PDFCompressor] Processing completed in ${duration.toFixed(2)}ms`
+    );
   }
 
   /**
@@ -879,8 +998,28 @@ class PDFCompressorApp {
    * @param {string} message - Error message to display
    */
   showErrorMessage(message) {
-    // Show error in UI
-    this.uiController.showNotification(message, 'error');
+    try {
+      if (
+        this.uiController &&
+        typeof this.uiController.showNotification === 'function'
+      ) {
+        this.uiController.showNotification(message, 'error');
+      } else {
+        // Fallback toast when UI not ready
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-error';
+        notification.textContent = String(message || 'Error');
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '\u00d7';
+        closeBtn.className = 'notification-close';
+        closeBtn.addEventListener('click', () => notification.remove());
+        notification.appendChild(closeBtn);
+        (document.body || document.documentElement).appendChild(notification);
+        setTimeout(() => notification.remove(), 5000);
+      }
+    } catch (_) {
+      // Last resort: console only
+    }
     console.error('[PDFCompressor] Error:', message);
   }
 
@@ -891,11 +1030,11 @@ class PDFCompressorApp {
    */
   formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
@@ -908,7 +1047,7 @@ class PDFCompressorApp {
   generateFileName(originalName, options) {
     const nameWithoutExt = originalName.replace(/\.[^/.]+$/, '');
     const extension = '.pdf';
-    
+
     let suffix = '';
     if (options.imageCompression) {
       suffix += `-compressed-${options.imageQuality}`;
@@ -919,9 +1058,9 @@ class PDFCompressorApp {
     if (options.splitPDF) {
       suffix += '-split';
     }
-    
+
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    
+
     return `${nameWithoutExt}${suffix}-${timestamp}${extension}`;
   }
 
@@ -951,11 +1090,11 @@ class PDFCompressorApp {
    */
   throttle(func, limit) {
     let inThrottle;
-    return function(...args) {
+    return function (...args) {
       if (!inThrottle) {
         func.apply(this, args);
         inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
+        setTimeout(() => (inThrottle = false), limit);
       }
     };
   }
@@ -965,8 +1104,14 @@ class PDFCompressorApp {
    * @param {Object} options - New options
    */
   updateProcessingOptions(options) {
-    this.state.processingOptions = { ...this.state.processingOptions, ...options };
-    console.log('[PDFCompressor] Processing options updated:', this.state.processingOptions);
+    this.state.processingOptions = {
+      ...this.state.processingOptions,
+      ...options,
+    };
+    console.log(
+      '[PDFCompressor] Processing options updated:',
+      this.state.processingOptions
+    );
   }
 
   /**
@@ -975,7 +1120,9 @@ class PDFCompressorApp {
    */
   addToQueue(task) {
     this.state.processingQueue.push(task);
-    console.log(`[PDFCompressor] Task added to queue. Queue length: ${this.state.processingQueue.length}`);
+    console.log(
+      `[PDFCompressor] Task added to queue. Queue length: ${this.state.processingQueue.length}`
+    );
   }
 
   /**
