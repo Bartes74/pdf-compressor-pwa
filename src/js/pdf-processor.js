@@ -458,6 +458,61 @@ export class PDFProcessor {
       return pdfDoc;
     }
   }
+
+  /**
+   * Compress to approximate target final size using bounded binary search over JPEG quality.
+   * - targetMB: desired size in megabytes
+   * Returns { processedDoc, qualityUsed }
+   */
+  async compressToTargetSize(pdfDoc, targetMB, progressCallback = null) {
+    const cloneDoc = async (doc) => {
+      const rebuilt = await this.PDFLib.PDFDocument.create();
+      const pc = doc.getPageCount();
+      const pages = await rebuilt.copyPages(doc, Array.from({ length: pc }, (_, i) => i));
+      pages.forEach(p => rebuilt.addPage(p));
+      return rebuilt;
+    };
+
+    const targetBytes = Math.max(1, Math.round(Number(targetMB) * 1024 * 1024));
+
+    // Quick early exit: if saving now is already <= target, return as-is
+    let baselineBytes;
+    try { baselineBytes = (await pdfDoc.save({ useObjectStreams: true, addDefaultPage: false, compress: true })).length; } catch { baselineBytes = Infinity; }
+    if (baselineBytes <= targetBytes) {
+      return { processedDoc: pdfDoc, qualityUsed: 100 };
+    }
+
+    let lowQ = 10; // percent
+    let highQ = 90; // conservative upper bound
+    let best = { bytes: Infinity, quality: lowQ, doc: pdfDoc };
+
+    for (let iter = 0; iter < 6; iter++) { // ~6 iters → 64 steps
+      const mid = Math.floor((lowQ + highQ) / 2);
+      if (progressCallback) progressCallback({ percentage: 15 + iter * 8, message: `Tuning quality… q=${mid}` });
+
+      // Work on a fresh clone to avoid cumulative degradation across iterations
+      let working = await cloneDoc(pdfDoc);
+      working = await this.compressImagesInMainThread(working, mid, null);
+      const bytes = (await working.save({ useObjectStreams: true, addDefaultPage: false, compress: true })).length;
+
+      // Track best candidate not exceeding target; otherwise smallest overall
+      const score = bytes <= targetBytes ? (targetBytes - bytes) : (bytes - targetBytes + 10_000_000);
+      if (score < (best.score ?? Number.POSITIVE_INFINITY)) {
+        best = { bytes, quality: mid, doc: working, score };
+      }
+
+      if (bytes > targetBytes) {
+        // too big → lower quality
+        highQ = Math.max(lowQ, mid - 1);
+      } else {
+        // under or equal → try higher quality but keep candidate
+        lowQ = Math.min(100, mid + 1);
+      }
+    }
+
+    if (progressCallback) progressCallback({ percentage: 80, message: `Selected q=${best.quality}` });
+    return { processedDoc: best.doc, qualityUsed: best.quality };
+  }
   
   /**
    * Prosty optimizer (no-op)

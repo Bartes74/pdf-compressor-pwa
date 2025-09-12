@@ -22,8 +22,14 @@ export function createEnhancedEngine(app) {
         processedDoc = await app.pdfProcessor.removeImagesPreserveText(processedDoc);
       }
 
-      // Compression: keep non-rasterizing placeholder for now
-      if (options.imageCompression) {
+      // Target size mode: binary search quality to meet target size
+      if (options.targetSizeMode && Number(options.targetSizeMB) > 0) {
+        if (progressCallback) progressCallback({ percentage: 10, message: 'Aiming for target size…' });
+        const targetMB = Math.max(1, Number(options.targetSizeMB));
+        const { processedDoc: doc, qualityUsed } = await app.pdfProcessor.compressToTargetSize(processedDoc, targetMB, progressCallback);
+        processedDoc = doc;
+        if (progressCallback) progressCallback({ percentage: 85, message: `Saving (q=${qualityUsed})…` });
+      } else if (options.imageCompression) {
         if (progressCallback) progressCallback({ percentage: 20, message: 'Compressing images…' });
         processedDoc = await app.pdfProcessor.compressImagesInMainThread(processedDoc, options.imageQuality, progressCallback);
       }

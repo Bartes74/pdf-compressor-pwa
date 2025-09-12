@@ -267,14 +267,28 @@
             <!-- Options Section -->
             <div class="options-section">
                 <div class="tabs">
-                    <div class="tab active" data-tab="compression">Compression</div>
+                    <div class="tab active" data-tab="target">Target Size</div>
+                    <div class="tab" data-tab="compression">Compression</div>
                     <div class="tab" data-tab="removal">Removal</div>
                     <div class="tab" data-tab="split">Split</div>
                 </div>
                 
                 <div class="tab-content">
+                    <!-- Target Size Tab -->
+                    <div class="tab-pane active" id="targetTab">
+                        <div class="option-item">
+                            <div class="option-header">
+                                <span class="option-label">Target PDF Size</span>
+                            </div>
+                            <div class="slider-container">
+                                <label for="targetSizeSlider">Target size: <span id="targetSizeValue">10</span> MB</label>
+                                <input type="range" id="targetSizeSlider" min="1" max="500" value="10">
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Compression Tab -->
-                    <div class="tab-pane active" id="compressionTab">
+                    <div class="tab-pane" id="compressionTab">
                         <div class="option-item">
                             <div class="option-header">
                                 <span class="option-label">Image Compression</span>

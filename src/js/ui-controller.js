@@ -98,6 +98,8 @@ export class UIController {
     this.elements.tabPanes = document.querySelectorAll('.tab-pane');
     this.elements.qualitySlider = document.getElementById('qualitySlider');
     this.elements.qualityValue = document.getElementById('qualityValue');
+    this.elements.targetSizeSlider = document.getElementById('targetSizeSlider');
+    this.elements.targetSizeValue = document.getElementById('targetSizeValue');
     this.elements.splitByPages = document.getElementById('splitByPages');
     this.elements.splitBySize = document.getElementById('splitBySize');
     this.elements.pageRange = document.getElementById('pageRange');
@@ -431,14 +433,24 @@ export class UIController {
    */
   applyActiveTabOptions(tabId) {
     if (!this.app) return;
-    if (tabId === 'compression') {
+    if (tabId === 'target') {
       this.app.updateProcessingOptions({
+        targetSizeMode: true,
+        targetSizeMB: Math.max(1, Number(this.elements.targetSizeSlider?.value || 10)),
+        imageCompression: false,
+        removeImages: false,
+        splitPDF: false,
+      });
+    } else if (tabId === 'compression') {
+      this.app.updateProcessingOptions({
+        targetSizeMode: false,
         imageCompression: true,
         removeImages: false,
         splitPDF: false,
       });
     } else if (tabId === 'removal') {
       this.app.updateProcessingOptions({
+        targetSizeMode: false,
         imageCompression: false,
         removeImages: true,
         splitPDF: false,
@@ -463,6 +475,17 @@ export class UIController {
    */
   setupOptionControls() {
     console.log('[UIController] Setting up option controls');
+
+    // Target size slider
+    if (this.elements.targetSizeSlider && this.elements.targetSizeValue) {
+      this.elements.targetSizeSlider.addEventListener('input', e => {
+        const mb = Math.max(1, Math.min(500, Number(e.target.value)));
+        this.elements.targetSizeValue.textContent = String(mb);
+        if (this.app) {
+          this.app.updateProcessingOptions({ targetSizeMode: true, targetSizeMB: mb });
+        }
+      });
+    }
 
     // Quality slider
     if (this.elements.qualitySlider && this.elements.qualityValue) {
