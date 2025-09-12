@@ -41,6 +41,7 @@ jobs:
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -50,11 +51,16 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          push: true
+          push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
           provenance: false
           sbom: false
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Note about missing Docker Hub secrets
+        if: ${{ !(secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' ) }}
+        run: |
+          echo "Docker Hub secrets are not set. Built the image locally in CI but did not push."
 
 
