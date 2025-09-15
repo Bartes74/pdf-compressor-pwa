@@ -6,6 +6,8 @@ npm-debug.log
 coverage
 dist/*.map
 dist/**/*.map
+# Ensure dist is included in build context (for runtime_local stage)
+!dist/**
 **/*.test.js
 **/__mocks__
 e2e
