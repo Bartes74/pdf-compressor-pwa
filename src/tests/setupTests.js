@@ -7,6 +7,40 @@ const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
+// Provide PDF libraries loader and global PDFLib for code paths that expect window.PDFLib
+Object.defineProperty(window, 'loadPDFLibraries', {
+  writable: true,
+  value: jest.fn(async () => {
+    try {
+      // Use the mocked pdf-lib module when present
+      // eslint-disable-next-line global-require
+      const mocked = require('pdf-lib');
+      window.PDFLib = mocked;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  })
+});
+
+// Mock Fetch API Response used by Cache API paths
+class MockResponse {
+  constructor(body) {
+    this._body = body;
+  }
+  async blob() {
+    if (this._body && typeof this._body.arrayBuffer === 'function') {
+      // Blob
+      return this._body;
+    }
+    // Fallback minimal blob
+    // eslint-disable-next-line no-undef
+    return new Blob([this._body || '']);
+  }
+}
+// eslint-disable-next-line no-undef
+global.Response = MockResponse;
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
@@ -22,28 +56,38 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock IndexedDB
-const mockIndexedDB = {
-  open: jest.fn().mockReturnValue({
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-    onsuccess: jest.fn(),
-    onerror: jest.fn(),
-    onupgradeneeded: jest.fn()
-  }),
-  deleteDatabase: jest.fn().mockReturnValue({
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn()
-  }),
-  cmp: jest.fn(),
-  databases: jest.fn().mockResolvedValue([])
-};
-
+// Mock IndexedDB with async event invocation so initDB() resolves
 Object.defineProperty(window, 'indexedDB', {
   writable: true,
-  value: mockIndexedDB
+  value: {
+    open: jest.fn().mockImplementation(() => {
+      const req = {
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+        onsuccess: null,
+        onerror: null,
+        onupgradeneeded: null
+      };
+      // Simulate upgrade then success in next ticks
+      setTimeout(() => {
+        if (typeof req.onupgradeneeded === 'function') {
+          req.onupgradeneeded({ target: { result: { objectStoreNames: { contains: () => false }, createObjectStore: () => ({ createIndex: () => {} }) } } });
+        }
+        if (typeof req.onsuccess === 'function') {
+          req.onsuccess({ target: { result: {} } });
+        }
+      }, 0);
+      return req;
+    }),
+    deleteDatabase: jest.fn().mockReturnValue({
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn()
+    }),
+    cmp: jest.fn(),
+    databases: jest.fn().mockResolvedValue([])
+  }
 });
 
 // Mock Cache API

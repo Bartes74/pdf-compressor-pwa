@@ -44,23 +44,25 @@ export class UIController {
    * Initialize the UI controller
    */
   init() {
-    console.log('[UIController] Initializing UI controller');
+    if (this.__isDebug())
+      console.log('[UIController] Initializing UI controller');
 
     // Cache DOM elements
     this.cacheElements();
-    console.log('[UIController] Elements cached:', {
-      dropArea: !!this.elements.dropArea,
-      fileInput: !!this.elements.fileInput,
-      browseBtn: !!this.elements.browseBtn,
-      tabs: this.elements.tabs ? this.elements.tabs.length : 0,
-      tabPanes: this.elements.tabPanes ? this.elements.tabPanes.length : 0,
-      qualitySlider: !!this.elements.qualitySlider,
-      targetSizeSlider: !!this.elements.targetSizeSlider,
-      splitByPages: !!this.elements.splitByPages,
-      splitBySize: !!this.elements.splitBySize,
-      processBtn: !!this.elements.processBtn,
-      resetBtn: !!this.elements.resetBtn,
-    });
+    if (this.__isDebug())
+      console.log('[UIController] Elements cached:', {
+        dropArea: !!this.elements.dropArea,
+        fileInput: !!this.elements.fileInput,
+        browseBtn: !!this.elements.browseBtn,
+        tabs: this.elements.tabs ? this.elements.tabs.length : 0,
+        tabPanes: this.elements.tabPanes ? this.elements.tabPanes.length : 0,
+        qualitySlider: !!this.elements.qualitySlider,
+        targetSizeSlider: !!this.elements.targetSizeSlider,
+        splitByPages: !!this.elements.splitByPages,
+        splitBySize: !!this.elements.splitBySize,
+        processBtn: !!this.elements.processBtn,
+        resetBtn: !!this.elements.resetBtn,
+      });
 
     // Bind event handlers
     this.bindEvents();
@@ -98,7 +100,7 @@ export class UIController {
    * Cache frequently used DOM elements
    */
   cacheElements() {
-    console.log('[UIController] Caching DOM elements');
+    if (this.__isDebug()) console.log('[UIController] Caching DOM elements');
 
     // Upload area elements
     this.elements.dropArea = document.getElementById('dropArea');
@@ -163,51 +165,58 @@ export class UIController {
    * Bind event handlers
    */
   bindEvents() {
-    console.log('[UIController] Binding event handlers');
+    if (this.__isDebug()) console.log('[UIController] Binding event handlers');
 
     // Upload handling events
     if (this.elements.browseBtn) {
-      console.log('[UIController] Binding click: browseBtn');
+      if (this.__isDebug())
+        console.log('[UIController] Binding click: browseBtn');
       this.elements.browseBtn.addEventListener('click', () => {
         if (this.elements.fileInput) {
-          console.log(
-            '[UIController] browseBtn clicked -> opening file dialog'
-          );
+          if (this.__isDebug())
+            console.log(
+              '[UIController] browseBtn clicked -> opening file dialog'
+            );
           this.elements.fileInput.click();
         }
       });
     }
 
     if (this.elements.fileInput) {
-      console.log('[UIController] Binding change: fileInput');
+      if (this.__isDebug())
+        console.log('[UIController] Binding change: fileInput');
       this.elements.fileInput.addEventListener('change', e => {
-        console.log(
-          '[UIController] fileInput change, files:',
-          e.target?.files?.length || 0
-        );
+        if (this.__isDebug())
+          console.log(
+            '[UIController] fileInput change, files:',
+            e.target?.files?.length || 0
+          );
         this.handleFileSelect(e);
       });
     }
 
     if (this.elements.dropArea) {
-      console.log('[UIController] Binding DnD: dropArea');
+      if (this.__isDebug()) console.log('[UIController] Binding DnD: dropArea');
       this.elements.dropArea.addEventListener('dragover', e => {
         e.preventDefault();
-        console.log('[UIController] dragover on dropArea');
+        if (this.__isDebug())
+          console.log('[UIController] dragover on dropArea');
         this.updateUploadArea(true);
       });
 
       this.elements.dropArea.addEventListener('dragleave', () => {
-        console.log('[UIController] dragleave on dropArea');
+        if (this.__isDebug())
+          console.log('[UIController] dragleave on dropArea');
         this.updateUploadArea(false);
       });
 
       this.elements.dropArea.addEventListener('drop', e => {
         e.preventDefault();
-        console.log(
-          '[UIController] drop on dropArea, items:',
-          e.dataTransfer?.files?.length || 0
-        );
+        if (this.__isDebug())
+          console.log(
+            '[UIController] drop on dropArea, items:',
+            e.dataTransfer?.files?.length || 0
+          );
         this.updateUploadArea(false);
         this.handleDrop(e);
       });
@@ -266,7 +275,7 @@ export class UIController {
    * Setup observers (Intersection, Resize)
    */
   setupObservers() {
-    console.log('[UIController] Setting up observers');
+    if (this.__isDebug()) console.log('[UIController] Setting up observers');
 
     // Resize observer for responsive design
     window.addEventListener(
@@ -405,11 +414,14 @@ export class UIController {
    */
   processSelectedFile(file) {
     // Call the actual app to process the file
-    console.log('[UIController] File selected:', file.name);
-    console.log('[UIController] App reference:', this.app);
+    if (this.__isDebug())
+      console.log('[UIController] File selected:', file.name);
+    if (this.__isDebug())
+      console.log('[UIController] App reference:', this.app);
 
     if (this.app) {
-      console.log('[UIController] Calling app.handleFileSelection');
+      if (this.__isDebug())
+        console.log('[UIController] Calling app.handleFileSelection');
       this.app.handleFileSelection(file);
     } else {
       console.warn(
@@ -432,17 +444,19 @@ export class UIController {
    */
   setupTabs() {
     if (!this.elements.tabs || !this.elements.tabPanes) return;
-
-    console.log(
-      '[UIController] Setting up tabs, count:',
-      this.elements.tabs.length
-    );
+    if (this.__isDebug()) {
+      console.log(
+        '[UIController] Setting up tabs, count:',
+        this.elements.tabs.length
+      );
+    }
     this.elements.tabs.forEach(tab => {
       tab.addEventListener('click', () => {
-        console.log(
-          '[UIController] Tab clicked:',
-          tab.getAttribute('data-tab')
-        );
+        if (this.__isDebug())
+          console.log(
+            '[UIController] Tab clicked:',
+            tab.getAttribute('data-tab')
+          );
         this.switchTab(tab);
         const tabId = tab.getAttribute('data-tab');
         this.applyActiveTabOptions(tabId);
@@ -461,10 +475,12 @@ export class UIController {
 
     // Add active class to clicked tab
     clickedTab.classList.add('active');
-    console.log(
-      '[UIController] switchTab -> now active:',
-      clickedTab.getAttribute('data-tab')
-    );
+    if (this.__isDebug()) {
+      console.log(
+        '[UIController] switchTab -> now active:',
+        clickedTab.getAttribute('data-tab')
+      );
+    }
 
     // Show corresponding pane
     const tabId = clickedTab.getAttribute('data-tab');
@@ -483,7 +499,8 @@ export class UIController {
    */
   applyActiveTabOptions(tabId) {
     if (!this.app) return;
-    console.log('[UIController] applyActiveTabOptions:', tabId);
+    if (this.__isDebug())
+      console.log('[UIController] applyActiveTabOptions:', tabId);
     if (tabId === 'target') {
       this.app.updateProcessingOptions({
         targetSizeMode: true,
@@ -515,7 +532,8 @@ export class UIController {
         method = 'size';
       if (this.elements.splitByPages && this.elements.splitByPages.checked)
         method = 'pages';
-      console.log('[UIController] split method selected:', method);
+      if (this.__isDebug())
+        console.log('[UIController] split method selected:', method);
       this.app.updateProcessingOptions({
         imageCompression: false,
         removeImages: false,
@@ -529,15 +547,18 @@ export class UIController {
    * Setup option controls event listeners
    */
   setupOptionControls() {
-    console.log('[UIController] Setting up option controls');
+    if (this.__isDebug())
+      console.log('[UIController] Setting up option controls');
 
     // Target size slider
     if (this.elements.targetSizeSlider && this.elements.targetSizeValue) {
-      console.log('[UIController] Binding input: targetSizeSlider');
+      if (this.__isDebug())
+        console.log('[UIController] Binding input: targetSizeSlider');
       this.elements.targetSizeSlider.addEventListener('input', e => {
         const mb = Math.max(1, Math.min(500, Number(e.target.value)));
         this.elements.targetSizeValue.textContent = String(mb);
-        console.log('[UIController] targetSizeSlider ->', mb, 'MB');
+        if (this.__isDebug())
+          console.log('[UIController] targetSizeSlider ->', mb, 'MB');
         if (this.app) {
           this.app.updateProcessingOptions({
             targetSizeMode: true,
@@ -549,10 +570,12 @@ export class UIController {
 
     // Quality slider
     if (this.elements.qualitySlider && this.elements.qualityValue) {
-      console.log('[UIController] Binding input: qualitySlider');
+      if (this.__isDebug())
+        console.log('[UIController] Binding input: qualitySlider');
       this.elements.qualitySlider.addEventListener('input', e => {
         this.elements.qualityValue.textContent = e.target.value;
-        console.log('[UIController] qualitySlider ->', e.target.value);
+        if (this.__isDebug())
+          console.log('[UIController] qualitySlider ->', e.target.value);
         if (this.app) {
           const quality = Math.max(10, Math.min(100, Number(e.target.value)));
           this.app.updateProcessingOptions({ imageQuality: quality });
@@ -562,7 +585,8 @@ export class UIController {
 
     // Split method radio buttons
     if (this.elements.splitByPages) {
-      console.log('[UIController] Binding change: splitByPages');
+      if (this.__isDebug())
+        console.log('[UIController] Binding change: splitByPages');
       this.elements.splitByPages.addEventListener('change', () => {
         console.log('[UIController] splitByPages selected');
         this.showSplitInput('pages');
@@ -573,7 +597,8 @@ export class UIController {
     }
 
     if (this.elements.splitBySize) {
-      console.log('[UIController] Binding change: splitBySize');
+      if (this.__isDebug())
+        console.log('[UIController] Binding change: splitBySize');
       this.elements.splitBySize.addEventListener('change', () => {
         console.log('[UIController] splitBySize selected');
         this.showSplitInput('size');
@@ -585,7 +610,8 @@ export class UIController {
 
     // Page range input
     if (this.elements.pageRange) {
-      console.log('[UIController] Binding input: pageRange');
+      if (this.__isDebug())
+        console.log('[UIController] Binding input: pageRange');
       this.elements.pageRange.addEventListener('input', e => {
         console.log('[UIController] pageRange ->', e.target.value);
         if (this.app) {
@@ -598,7 +624,8 @@ export class UIController {
 
     // File size limit input
     if (this.elements.fileSizeLimit) {
-      console.log('[UIController] Binding input: fileSizeLimit');
+      if (this.__isDebug())
+        console.log('[UIController] Binding input: fileSizeLimit');
       this.elements.fileSizeLimit.addEventListener('input', e => {
         console.log('[UIController] fileSizeLimit ->', e.target.value);
         if (this.app) {
@@ -608,6 +635,26 @@ export class UIController {
         }
       });
     }
+  }
+
+  // Test helpers for older tests expecting these methods
+  updateQualitySlider(value) {
+    if (this.elements.qualityValue) {
+      this.elements.qualityValue.textContent = String(value);
+    }
+  }
+
+  updateSplitControls(method) {
+    this.showSplitInput(method);
+  }
+
+  validateInputs() {
+    // Validate pageRange like "1-5" and fileSizeLimit between 1 and 500
+    const pr = this.elements.pageRange ? String(this.elements.pageRange.value || '').trim() : '';
+    const fs = this.elements.fileSizeLimit ? Number(this.elements.fileSizeLimit.value || 0) : 0;
+    const rangeOk = pr === '' || /^\d+-\d+$/.test(pr);
+    const sizeOk = !fs || (fs >= 1 && fs <= 500);
+    return rangeOk && sizeOk;
   }
 
   /**
@@ -721,9 +768,11 @@ export class UIController {
 
     // Validate file sizes
     if (files.originalFile && files.processedFile) {
-      console.log(
-        `[UIController] File sizes - Original: ${files.originalFile.size}, Processed: ${files.processedFile.size}`
-      );
+      if (this.__isDebug()) {
+        console.log(
+          `[UIController] File sizes - Original: ${files.originalFile.size}, Processed: ${files.processedFile.size}`
+        );
+      }
 
       // Check for potential issues with large files
       if (
@@ -731,9 +780,11 @@ export class UIController {
         files.processedFile.size < 1024
       ) {
         // Original file is >100MB but processed file is <1KB - likely an error
-        console.warn(
-          '[UIController] Potential issue: Large original file but very small processed file'
-        );
+        if (this.__isDebug()) {
+          console.warn(
+            '[UIController] Potential issue: Large original file but very small processed file'
+          );
+        }
         this.showNotification(
           'Warning: Processed file seems unusually small. There may have been an error during processing.',
           'warning'
@@ -1311,11 +1362,13 @@ export class UIController {
    * Handle process button click
    */
   handleProcess() {
-    console.log('[UIController] Process button clicked');
-    console.log('[UIController] App reference:', this.app);
+    if (this.__isDebug()) console.log('[UIController] Process button clicked');
+    if (this.__isDebug())
+      console.log('[UIController] App reference:', this.app);
 
     if (this.app) {
-      console.log('[UIController] Calling app.processPDF');
+      if (this.__isDebug())
+        console.log('[UIController] Calling app.processPDF');
       this.app.processPDF();
     } else {
       console.warn('[UIController] No app reference available for processing');
@@ -1345,7 +1398,7 @@ export class UIController {
    * Reset application state
    */
   resetApp() {
-    console.log('[UIController] Resetting application');
+    if (this.__isDebug()) console.log('[UIController] Resetting application');
 
     // Reset UI
     this.resetUploadArea();
@@ -1361,8 +1414,17 @@ export class UIController {
    * @param {Object} app - Reference to the main PDFCompressorApp instance
    */
   setApp(app) {
-    console.log('[UIController] Setting app reference:', app);
+    if (this.__isDebug())
+      console.log('[UIController] Setting app reference:', app);
     this.app = app;
+  }
+
+  __isDebug() {
+    try {
+      return Boolean(new URLSearchParams(window.location.search).get('debug'));
+    } catch (_) {
+      return false;
+    }
   }
 }
 

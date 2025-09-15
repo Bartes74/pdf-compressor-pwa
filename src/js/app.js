@@ -1,14 +1,4 @@
 // Loading indicators
-window.showLoadingLibraries = function () {
-  const loader = document.getElementById('library-loader');
-  if (loader) loader.style.display = 'block';
-};
-
-window.hideLoadingLibraries = function () {
-  const loader = document.getElementById('library-loader');
-  if (loader) loader.style.display = 'none';
-};
-
 import { UIController } from './ui-controller.js';
 import { createEngine } from './engine/index.js';
 // Remove static imports of PDFProcessor and StorageManager since we'll load them dynamically
@@ -16,7 +6,6 @@ import { createEngine } from './engine/index.js';
 // import { StorageManager } from './storage-manager.js';
 
 // We'll initialize storage manager dynamically
-const storageManager = null; // kept as let for late dynamic init across modules
 
 /**
  * PDF Compressor PWA - Main Application Class
@@ -27,6 +16,9 @@ class PDFCompressorApp {
    * Constructor - Initialize app properties and start initialization
    */
   constructor() {
+    this.__debug = Boolean(
+      new URLSearchParams(window.location.search).get('debug')
+    );
     // Core components
     this.pdfProcessor = null;
     this.storageManager = null;
@@ -77,7 +69,8 @@ class PDFCompressorApp {
    */
   async initializeApp() {
     try {
-      console.log('[PDFCompressor] Initializing application...');
+      if (this.__debug)
+        console.log('[PDFCompressor] Initializing application...');
 
       // Check for required API support
       if (!this.checkAPISupport()) {
@@ -109,7 +102,8 @@ class PDFCompressorApp {
         console.warn('[PDFCompressor] Storage manager init warning:', e);
       }
 
-      console.log('[PDFCompressor] Application initialized successfully');
+      if (this.__debug)
+        console.log('[PDFCompressor] Application initialized successfully');
     } catch (error) {
       console.error('[PDFCompressor] Initialization error:', error);
       this.showErrorMessage(
@@ -237,7 +231,8 @@ class PDFCompressorApp {
       // Keep Process button enabled after metadata is loaded
       if (processBtn) processBtn.disabled = false;
 
-      console.log(`[PDFCompressor] File loaded: ${file.name}`);
+      if (this.__debug)
+        console.log(`[PDFCompressor] File loaded: ${file.name}`);
     } catch (error) {
       console.error('[PDFCompressor] Error handling file:', error);
       this.showErrorMessage('Error loading file: ' + error.message);
@@ -309,12 +304,14 @@ class PDFCompressorApp {
    */
   async processPDF() {
     try {
-      console.log(
-        '[PDFCompressor] processPDF() called with options:',
-        this.state.processingOptions,
-        'file:',
-        this.state.currentFile?.name
-      );
+      if (this.__debug) {
+        console.log(
+          '[PDFCompressor] processPDF() called with options:',
+          this.state.processingOptions,
+          'file:',
+          this.state.currentFile?.name
+        );
+      }
       // Ensure there is a file selected
       if (!this.state.currentFile) {
         this.showErrorMessage('No PDF file selected');
@@ -670,44 +667,14 @@ class PDFCompressorApp {
    * Dynamic import for Web Worker
    */
   async loadWorker() {
-    if (!this.worker) {
-      const { PDFWorker } = await import(
-        /* webpackChunkName: "pdf-worker" */
-        './pdf-worker.js'
-      );
-      this.worker = new PDFWorker();
-    }
-    return this.worker;
+    return null;
   }
 
   /**
    * Load PDF libraries dynamically when needed
    */
   async loadPDFLibraries() {
-    try {
-      console.log('[PDFCompressor] Loading PDF libraries...');
-
-      // Check if libraries are already available globally
-      if (
-        typeof window.PDFLib !== 'undefined' &&
-        typeof window.pdfjsLib !== 'undefined'
-      ) {
-        console.log('[PDFCompressor] PDF libraries already loaded from CDN');
-        return {
-          PDFDocument: window.PDFLib.PDFDocument,
-          rgb: window.PDFLib.rgb,
-          pdfjsLib: window.pdfjsLib,
-        };
-      }
-
-      // If not available, we could load them dynamically
-      // But in this case, we're relying on the CDN scripts in index.html
-      console.log('[PDFCompressor] PDF libraries should be loaded from CDN');
-      return null;
-    } catch (error) {
-      console.error('[PDFCompressor] Error accessing PDF libraries:', error);
-      throw new Error('Failed to access PDF processing libraries');
-    }
+    return null;
   }
 
   /**
@@ -996,9 +963,11 @@ class PDFCompressorApp {
     );
 
     const duration = this.performance.endTime - this.performance.startTime;
-    console.log(
-      `[PDFCompressor] Processing completed in ${duration.toFixed(2)}ms`
-    );
+    if (this.__debug) {
+      console.log(
+        `[PDFCompressor] Processing completed in ${duration.toFixed(2)}ms`
+      );
+    }
   }
 
   /**
