@@ -18,10 +18,8 @@ module.exports = {
     clean: true,
     assetModuleFilename: 'assets/[hash][ext][query]',
   },
-  externals: {
-    'pdf-lib': 'PDFLib',
-    'pdfjs-dist': 'pdfjsLib',
-  },
+  // Bundle libraries locally instead of using CDN externals
+  externals: {},
   module: {
     rules: [
       {
@@ -85,6 +83,10 @@ module.exports = {
         { from: 'public/service-worker.js', to: 'service-worker.js' },
         { from: 'src/assets/icons', to: 'assets/icons' },
         { from: 'src/assets/bart_ex.png', to: 'assets/bart_ex.png' },
+        // Vendor: local copies of pdf-lib and pdfjs (main and worker)
+        { from: 'node_modules/pdf-lib/dist/pdf-lib.min.js', to: 'vendor/pdf-lib.min.js' },
+        { from: 'node_modules/pdfjs-dist/build/pdf.min.js', to: 'vendor/pdf.min.js' },
+        { from: 'node_modules/pdfjs-dist/build/pdf.worker.min.js', to: 'vendor/pdf.worker.min.js' },
       ],
     }),
     new WebpackPwaManifest({

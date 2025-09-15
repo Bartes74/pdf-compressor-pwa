@@ -28,7 +28,7 @@
     
     <!-- Lazy loading bibliotek PDF -->
     <script>
-      // Funkcja do ładowania bibliotek PDF
+      // Funkcja do ładowania bibliotek PDF (lokalnie z /vendor)
       window.loadPDFLibraries = async function() {
         console.log('Loading PDF libraries...');
         
@@ -86,38 +86,11 @@
             window.showLoadingLibraries();
           }
           
-          // Załaduj pdf-lib
-          if (!window.PDFLib) {
-            console.log('Loading pdf-lib...');
-            await loadScript(
-              'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
-              'PDFLib'
-            );
-            
-            // Sprawdź czy załadowano poprawnie
-            if (!window.PDFLib) {
-              throw new Error('PDFLib not available after loading');
-            }
-            
-            console.log('pdf-lib loaded successfully:', {
-              PDFDocument: !!window.PDFLib.PDFDocument,
-              load: typeof window.PDFLib.PDFDocument?.load
-            });
-          }
-          
-          // Załaduj pdf.js (opcjonalnie)
-          if (!window.pdfjsLib) {
-            console.log('Loading pdf.js...');
-            await loadScript(
-              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-              'pdfjsLib'
-            );
-            
-            if (window.pdfjsLib) {
-              pdfjsLib.GlobalWorkerOptions.workerSrc = 
-                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-              console.log('pdf.js loaded successfully');
-            }
+          // Ładuj lokalne pliki vendor zamiast CDN
+          await loadScript('/vendor/pdf-lib.min.js', 'PDFLib');
+          await loadScript('/vendor/pdf.min.js', 'pdfjsLib');
+          if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdf.worker.min.js';
           }
           
           // Ukryj loader
@@ -136,10 +109,6 @@
             window.hideLoadingLibraries();
           }
           
-          // Spróbuj załadować lokalnie jako fallback
-          console.log('Trying local fallback...');
-          
-          // Tu możesz dodać fallback do lokalnych plików
           return false;
         }
       };
@@ -231,7 +200,7 @@
     </header>
     
     
-
+    
     <main>
         <div class="upload-container">
             <!-- Drag and Drop Area -->

@@ -37,6 +37,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^3.11.174",
     "is-fullwidth-code-point": "^5.1.0",
     "string-width": "^8.1.0"
   },
