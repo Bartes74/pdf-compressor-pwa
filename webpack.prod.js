@@ -28,6 +28,7 @@ module.exports = merge(common, {
     minimize: true,
     minimizer: [
       new TerserPlugin({
+        parallel: false,
         terserOptions: {
           compress: {
             drop_console: true,
@@ -37,7 +38,7 @@ module.exports = merge(common, {
           keep_fnames: false
         }
       }),
-      new CssMinimizerPlugin()
+      new CssMinimizerPlugin({ parallel: false })
     ],
     splitChunks: {
       chunks: 'all',
