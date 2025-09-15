@@ -1,6 +1,6 @@
 {
   "name": "pdf-compressor-pwa",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Progressive Web App for compressing PDF files",
   "main": "electron/main.js",
   "scripts": {

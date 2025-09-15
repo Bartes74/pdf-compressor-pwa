@@ -1,4 +1,4 @@
-wypchnij ### Developer Guide
+wypchnij xxxxxxxx### Developer Guide
 
 This guide explains setup, development workflows, debugging, testing, and releasing.
 

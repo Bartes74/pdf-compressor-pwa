@@ -32,10 +32,19 @@
   },
   "overrides": [
     {
+      "files": [
+        "webpack.*.js",
+        "webpack/**/*.js",
+        "*.config.js",
+        "electron/**/*.js"
+      ],
+      "env": { "node": true, "browser": false },
+      "rules": { "no-undef": "off" }
+    },
+    {
       "files": ["src/tests/**/*.js"],
       "env": { "jest": true, "node": true },
       "rules": { "no-undef": "off" }
     }
   ]
 }
-

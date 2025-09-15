@@ -1138,11 +1138,23 @@ class PDFCompressorApp {
 }
 
 // Initialize the app when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('[PDFCompressor] DOM Content Loaded, initializing app...');
-  window.pdfCompressorApp = new PDFCompressorApp();
-  console.log('[PDFCompressor] App initialized:', window.pdfCompressorApp);
-});
+function __initPdfCompressorApp() {
+  try {
+    console.log('[PDFCompressor] Initializing app instance...');
+    window.pdfCompressorApp = new PDFCompressorApp();
+    console.log('[PDFCompressor] App initialized:', window.pdfCompressorApp);
+  } catch (e) {
+    console.error('[PDFCompressor] Failed to initialize app:', e);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', __initPdfCompressorApp, {
+    once: true,
+  });
+} else {
+  __initPdfCompressorApp();
+}
 
 // Export for potential use in other modules
 export { PDFCompressorApp };
