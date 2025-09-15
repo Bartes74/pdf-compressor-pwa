@@ -48,6 +48,19 @@ export class UIController {
 
     // Cache DOM elements
     this.cacheElements();
+    console.log('[UIController] Elements cached:', {
+      dropArea: !!this.elements.dropArea,
+      fileInput: !!this.elements.fileInput,
+      browseBtn: !!this.elements.browseBtn,
+      tabs: this.elements.tabs ? this.elements.tabs.length : 0,
+      tabPanes: this.elements.tabPanes ? this.elements.tabPanes.length : 0,
+      qualitySlider: !!this.elements.qualitySlider,
+      targetSizeSlider: !!this.elements.targetSizeSlider,
+      splitByPages: !!this.elements.splitByPages,
+      splitBySize: !!this.elements.splitBySize,
+      processBtn: !!this.elements.processBtn,
+      resetBtn: !!this.elements.resetBtn,
+    });
 
     // Bind event handlers
     this.bindEvents();
@@ -73,6 +86,10 @@ export class UIController {
       t.classList.contains('active')
     );
     if (activeTab) {
+      console.log(
+        '[UIController] Active tab on init:',
+        activeTab.getAttribute('data-tab')
+      );
       this.applyActiveTabOptions(activeTab.getAttribute('data-tab'));
     }
   }
@@ -98,7 +115,8 @@ export class UIController {
     this.elements.tabPanes = document.querySelectorAll('.tab-pane');
     this.elements.qualitySlider = document.getElementById('qualitySlider');
     this.elements.qualityValue = document.getElementById('qualityValue');
-    this.elements.targetSizeSlider = document.getElementById('targetSizeSlider');
+    this.elements.targetSizeSlider =
+      document.getElementById('targetSizeSlider');
     this.elements.targetSizeValue = document.getElementById('targetSizeValue');
     this.elements.splitByPages = document.getElementById('splitByPages');
     this.elements.splitBySize = document.getElementById('splitBySize');
@@ -149,31 +167,47 @@ export class UIController {
 
     // Upload handling events
     if (this.elements.browseBtn) {
+      console.log('[UIController] Binding click: browseBtn');
       this.elements.browseBtn.addEventListener('click', () => {
         if (this.elements.fileInput) {
+          console.log(
+            '[UIController] browseBtn clicked -> opening file dialog'
+          );
           this.elements.fileInput.click();
         }
       });
     }
 
     if (this.elements.fileInput) {
+      console.log('[UIController] Binding change: fileInput');
       this.elements.fileInput.addEventListener('change', e => {
+        console.log(
+          '[UIController] fileInput change, files:',
+          e.target?.files?.length || 0
+        );
         this.handleFileSelect(e);
       });
     }
 
     if (this.elements.dropArea) {
+      console.log('[UIController] Binding DnD: dropArea');
       this.elements.dropArea.addEventListener('dragover', e => {
         e.preventDefault();
+        console.log('[UIController] dragover on dropArea');
         this.updateUploadArea(true);
       });
 
       this.elements.dropArea.addEventListener('dragleave', () => {
+        console.log('[UIController] dragleave on dropArea');
         this.updateUploadArea(false);
       });
 
       this.elements.dropArea.addEventListener('drop', e => {
         e.preventDefault();
+        console.log(
+          '[UIController] drop on dropArea, items:',
+          e.dataTransfer?.files?.length || 0
+        );
         this.updateUploadArea(false);
         this.handleDrop(e);
       });
@@ -187,13 +221,17 @@ export class UIController {
 
     // Action buttons
     if (this.elements.resetBtn) {
+      console.log('[UIController] Binding click: resetBtn');
       this.elements.resetBtn.addEventListener('click', () => {
+        console.log('[UIController] resetBtn clicked');
         this.resetApp();
       });
     }
 
     if (this.elements.processBtn) {
+      console.log('[UIController] Binding click: processBtn');
       this.elements.processBtn.addEventListener('click', () => {
+        console.log('[UIController] processBtn clicked');
         this.handleProcess();
       });
     }
@@ -395,8 +433,16 @@ export class UIController {
   setupTabs() {
     if (!this.elements.tabs || !this.elements.tabPanes) return;
 
+    console.log(
+      '[UIController] Setting up tabs, count:',
+      this.elements.tabs.length
+    );
     this.elements.tabs.forEach(tab => {
       tab.addEventListener('click', () => {
+        console.log(
+          '[UIController] Tab clicked:',
+          tab.getAttribute('data-tab')
+        );
         this.switchTab(tab);
         const tabId = tab.getAttribute('data-tab');
         this.applyActiveTabOptions(tabId);
@@ -415,6 +461,10 @@ export class UIController {
 
     // Add active class to clicked tab
     clickedTab.classList.add('active');
+    console.log(
+      '[UIController] switchTab -> now active:',
+      clickedTab.getAttribute('data-tab')
+    );
 
     // Show corresponding pane
     const tabId = clickedTab.getAttribute('data-tab');
@@ -433,10 +483,14 @@ export class UIController {
    */
   applyActiveTabOptions(tabId) {
     if (!this.app) return;
+    console.log('[UIController] applyActiveTabOptions:', tabId);
     if (tabId === 'target') {
       this.app.updateProcessingOptions({
         targetSizeMode: true,
-        targetSizeMB: Math.max(1, Number(this.elements.targetSizeSlider?.value || 10)),
+        targetSizeMB: Math.max(
+          1,
+          Number(this.elements.targetSizeSlider?.value || 10)
+        ),
         imageCompression: false,
         removeImages: false,
         splitPDF: false,
@@ -461,6 +515,7 @@ export class UIController {
         method = 'size';
       if (this.elements.splitByPages && this.elements.splitByPages.checked)
         method = 'pages';
+      console.log('[UIController] split method selected:', method);
       this.app.updateProcessingOptions({
         imageCompression: false,
         removeImages: false,
@@ -478,19 +533,26 @@ export class UIController {
 
     // Target size slider
     if (this.elements.targetSizeSlider && this.elements.targetSizeValue) {
+      console.log('[UIController] Binding input: targetSizeSlider');
       this.elements.targetSizeSlider.addEventListener('input', e => {
         const mb = Math.max(1, Math.min(500, Number(e.target.value)));
         this.elements.targetSizeValue.textContent = String(mb);
+        console.log('[UIController] targetSizeSlider ->', mb, 'MB');
         if (this.app) {
-          this.app.updateProcessingOptions({ targetSizeMode: true, targetSizeMB: mb });
+          this.app.updateProcessingOptions({
+            targetSizeMode: true,
+            targetSizeMB: mb,
+          });
         }
       });
     }
 
     // Quality slider
     if (this.elements.qualitySlider && this.elements.qualityValue) {
+      console.log('[UIController] Binding input: qualitySlider');
       this.elements.qualitySlider.addEventListener('input', e => {
         this.elements.qualityValue.textContent = e.target.value;
+        console.log('[UIController] qualitySlider ->', e.target.value);
         if (this.app) {
           const quality = Math.max(10, Math.min(100, Number(e.target.value)));
           this.app.updateProcessingOptions({ imageQuality: quality });
@@ -500,7 +562,9 @@ export class UIController {
 
     // Split method radio buttons
     if (this.elements.splitByPages) {
+      console.log('[UIController] Binding change: splitByPages');
       this.elements.splitByPages.addEventListener('change', () => {
+        console.log('[UIController] splitByPages selected');
         this.showSplitInput('pages');
         if (this.app) {
           this.app.updateProcessingOptions({ splitMethod: 'pages' });
@@ -509,7 +573,9 @@ export class UIController {
     }
 
     if (this.elements.splitBySize) {
+      console.log('[UIController] Binding change: splitBySize');
       this.elements.splitBySize.addEventListener('change', () => {
+        console.log('[UIController] splitBySize selected');
         this.showSplitInput('size');
         if (this.app) {
           this.app.updateProcessingOptions({ splitMethod: 'size' });
@@ -519,7 +585,9 @@ export class UIController {
 
     // Page range input
     if (this.elements.pageRange) {
+      console.log('[UIController] Binding input: pageRange');
       this.elements.pageRange.addEventListener('input', e => {
+        console.log('[UIController] pageRange ->', e.target.value);
         if (this.app) {
           this.app.updateProcessingOptions({
             pageRange: String(e.target.value || '').trim(),
@@ -530,7 +598,9 @@ export class UIController {
 
     // File size limit input
     if (this.elements.fileSizeLimit) {
+      console.log('[UIController] Binding input: fileSizeLimit');
       this.elements.fileSizeLimit.addEventListener('input', e => {
+        console.log('[UIController] fileSizeLimit ->', e.target.value);
         if (this.app) {
           const parsed = this.parseSizeToMB(String(e.target.value || ''));
           const val = Math.max(1, Math.min(500, parsed));

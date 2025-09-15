@@ -91,7 +91,7 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.35);
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,7 +163,9 @@
 }
 
 @keyframes spinner {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Ulepszone style dla opcji usuwania obrazków */
@@ -174,13 +176,15 @@
 
 .option-card.remove-images.active {
   border-color: var(--primary);
-  background: linear-gradient(135deg, 
-    rgba(2, 125, 143, 0.05) 0%, 
-    rgba(3, 169, 193, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(2, 125, 143, 0.05) 0%,
+    rgba(3, 169, 193, 0.05) 100%
+  );
 }
 
 .option-card.remove-images .option-icon {
-  background: linear-gradient(135deg, var(--error) 0%, #FF6B6B 100%);
+  background: linear-gradient(135deg, var(--error) 0%, #ff6b6b 100%);
 }
 
 /* Tooltip dla informacji */
@@ -230,63 +234,66 @@
 /* Main Styles for PDF Compressor PWA */
 :root {
   /* Light mode - nowoczesna paleta z wiodącym #027D8F */
-  --primary: #027D8F;
-  --primary-dark: #025A68;
-  --primary-light: #03A9C1;
-  --secondary: #00BCD4;
-  --accent: #00E5FF;
-  
+  --primary: #027d8f;
+  --primary-dark: #025a68;
+  --primary-light: #03a9c1;
+  --secondary: #00bcd4;
+  --accent: #00e5ff;
+
   /* Neutralne */
-  --background: #F5F7FA;
-  --surface: #FFFFFF;
-  --surface-elevated: #FFFFFF;
-  
+  --background: #f5f7fa;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+
   /* Tekst */
-  --text-primary: #1A202C;
-  --text-secondary: #4A5568;
-  --text-disabled: #A0AEC0;
-  
+  --text-primary: #1a202c;
+  --text-secondary: #4a5568;
+  --text-disabled: #a0aec0;
+
   /* Stan */
-  --success: #48BB78;
-  --warning: #ED8936;
-  --error: #F56565;
-  --info: #4299E1;
-  
+  --success: #48bb78;
+  --warning: #ed8936;
+  --error: #f56565;
+  --info: #4299e1;
+
   /* Borders i cienie */
-  --border: #E2E8F0;
-  --border-hover: #CBD5E0;
+  --border: #e2e8f0;
+  --border-hover: #cbd5e0;
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  
+  --shadow-md:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
   /* Focus states for accessibility */
   --focus-outline: 2px solid var(--primary);
   --focus-offset: 2px;
 }
 
 /* Dark mode */
-[data-theme="dark"] {
-  --primary: #03A9C1;
-  --primary-dark: #027D8F;
-  --primary-light: #29D5ED;
-  --secondary: #00E5FF;
-  --accent: #18FFFF;
-  
+[data-theme='dark'] {
+  --primary: #03a9c1;
+  --primary-dark: #027d8f;
+  --primary-light: #29d5ed;
+  --secondary: #00e5ff;
+  --accent: #18ffff;
+
   /* Neutralne dla dark mode - lepszy kontrast */
-  --background: #0F172A;
-  --surface: #1E293B;
+  --background: #0f172a;
+  --surface: #1e293b;
   --surface-elevated: #334155;
-  
+
   /* Tekst z wysokim kontrastem */
-  --text-primary: #F1F5F9;
-  --text-secondary: #CBD5E0;
-  --text-disabled: #64748B;
-  
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e0;
+  --text-disabled: #64748b;
+
   /* Borders dla dark mode */
   --border: #334155;
   --border-hover: #475569;
-  
+
   /* Cienie dla dark mode */
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
@@ -296,25 +303,35 @@
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { 
+  from {
     transform: translateY(20px);
     opacity: 0;
   }
-  to { 
+  to {
     transform: translateY(0);
     opacity: 1;
   }
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 * {
@@ -328,10 +345,14 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
   background: var(--background);
   color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
   min-height: 100vh;
   margin: 0;
   padding: 0;
@@ -433,16 +454,20 @@ main {
 
 .drop-area:hover {
   border-color: var(--primary);
-  background: linear-gradient(135deg, 
-    rgba(2, 125, 143, 0.05) 0%, 
-    rgba(3, 169, 193, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(2, 125, 143, 0.05) 0%,
+    rgba(3, 169, 193, 0.05) 100%
+  );
 }
 
 .drop-area.dragover {
   border-color: var(--primary);
-  background: linear-gradient(135deg, 
-    rgba(2, 125, 143, 0.1) 0%, 
-    rgba(3, 169, 193, 0.1) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(2, 125, 143, 0.1) 0%,
+    rgba(3, 169, 193, 0.1) 100%
+  );
   transform: scale(1.01);
 }
 
@@ -624,6 +649,37 @@ main {
   border: none;
 }
 
+/* Target Size slider styled identical to quality slider */
+#targetSizeSlider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+#targetSizeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+#targetSizeSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  border: none;
+}
+
 /* Split options */
 .split-options {
   margin-top: 0.75rem;
@@ -636,7 +692,7 @@ main {
   margin-bottom: 0.75rem;
 }
 
-.radio-group input[type="radio"] {
+.radio-group input[type='radio'] {
   width: 16px;
   height: 16px;
   accent-color: var(--primary);
@@ -710,7 +766,11 @@ button {
 }
 
 #processBtn {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   color: white;
   box-shadow: var(--shadow-md);
 }
@@ -739,9 +799,9 @@ button {
 }
 
 .progress-bar {
-  height: 18px;
+  height: 12px;
   background-color: var(--background);
-  border-radius: 9px;
+  border-radius: 6px;
   overflow: hidden;
   margin-bottom: 0.75rem;
   border: 1px solid var(--border);
@@ -749,8 +809,12 @@ button {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
-  border-radius: 9px;
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
+  border-radius: 6px;
   width: 0%;
   transition: width 0.3s ease;
 }
@@ -810,7 +874,11 @@ button {
 .split-result-actions a.button-download {
   display: inline-block;
   padding: 0.35rem 0.9rem;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   color: white;
   border-radius: 5px;
   text-decoration: none;
@@ -849,7 +917,11 @@ button {
 .result-item a {
   display: inline-block;
   padding: 0.4rem 1rem;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   color: white;
   border-radius: 5px;
   text-decoration: none;
@@ -909,9 +981,12 @@ button {
 }
 
 /* Permanently hide install banner */
-.install-banner { display: none !important; }
+.install-banner {
+  display: none !important;
+}
 
-.install-banner button, .offline-notification button {
+.install-banner button,
+.offline-notification button {
   padding: 0.4rem 0.8rem;
   border: none;
   border-radius: 5px;

@@ -791,13 +791,27 @@ class PDFCompressorApp {
       console.log('[PDFCompressor] DOM Content Loaded');
     });
 
+    // Global click logger (debug)
+    document.addEventListener('click', e => {
+      try {
+        const target = e.target;
+        const desc = target?.id || target?.className || target?.nodeName;
+        console.log('[UI][Click]', desc);
+      } catch (_) {
+        return;
+      }
+    });
+
     // File input and upload area bindings
     const fileInput = document.getElementById('fileInput');
-    const uploadArea = document.getElementById('uploadArea');
+    // Fix: actual drop area id is 'dropArea' in HTML
+    const uploadArea = document.getElementById('dropArea');
     if (fileInput) {
+      console.log('[App] Binding change: #fileInput');
       fileInput.addEventListener('change', e => this.handleFileSelect(e));
     }
     if (uploadArea) {
+      console.log('[App] Binding uploadArea handlers');
       uploadArea.addEventListener('click', () => fileInput?.click());
       uploadArea.addEventListener('dragover', e => this.handleDragOver(e));
       uploadArea.addEventListener('dragleave', e => this.handleDragLeave(e));
@@ -806,10 +820,12 @@ class PDFCompressorApp {
 
     const processBtn = document.getElementById('processBtn');
     if (processBtn) {
+      console.log('[App] Binding click: #processBtn');
       processBtn.addEventListener('click', () => this.processPDF());
     }
     const resetBtn = document.getElementById('resetBtn');
     if (resetBtn) {
+      console.log('[App] Binding click: #resetBtn');
       resetBtn.addEventListener('click', () => this.resetApp());
     }
 
